@@ -40,16 +40,10 @@ jobs:
           from pathlib import Path
           p=Path('/tmp/src/S3XYCommanderLabAndroid/app/src/main/java/com/openai/s3xylab/MainActivity.java')
           s=p.read_text()
-          old='''            String addr;
-            try { addr = result.getDevice().getAddress(); } catch (Exception e) { addr = "?"; }
-            String tag = classify(displayName);'''
-          new='''            String tmpAddr;
-            try { tmpAddr = result.getDevice().getAddress(); } catch (Exception e) { tmpAddr = "?"; }
-            final String addr = tmpAddr;
-            String tag = classify(displayName);'''
-          if old not in s:
-              raise SystemExit('patch target not found')
-          p.write_text(s.replace(old,new,1))
+          s=s.replace('String addr;', 'String tmpAddr;', 1)
+          s=s.replace('try { addr = result.getDevice().getAddress(); } catch (Exception e) { addr = "?"; }',
+                      'try { tmpAddr = result.getDevice().getAddress(); } catch (Exception e) { tmpAddr = "?"; }\n            final String addr = tmpAddr;', 1)
+          p.write_text(s)
           PY
 
       - name: Run protocol self-tests
