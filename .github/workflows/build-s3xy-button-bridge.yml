@@ -11,14 +11,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Rebuild updater source
+      - name: Rebuild verified full-feature source
         shell: bash
         run: |
-          cat s3xy-updater/src-00.b64 s3xy-updater/src-01.b64 s3xy-updater/src-02.b64 s3xy-updater/src-03.b64 > /tmp/updater.b64
-          base64 -d /tmp/updater.b64 > /tmp/updater.tgz
+          cat s3xy-full/full-00.b64 s3xy-full/full-01.b64 s3xy-full/full-02.b64 > /tmp/full.b64
+          base64 -d /tmp/full.b64 > /tmp/full.tgz
           mkdir -p /tmp/src
-          tar -xzf /tmp/updater.tgz -C /tmp/src
+          tar -xzf /tmp/full.tgz -C /tmp/src
           test -f /tmp/src/S3XYButtonBridgeAndroid/app/build.gradle
+
+      - name: Apply in-app updater
+        shell: bash
+        run: python3 s3xy-updater/patch_updater.py
 
       - uses: actions/setup-java@v4
         with:
