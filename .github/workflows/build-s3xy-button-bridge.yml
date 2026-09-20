@@ -60,6 +60,12 @@ jobs:
           p.write_text(s)
           PY
 
+      - name: Apply redesigned UI
+        shell: bash
+        run: |
+          base64 -d s3xy-ui/redesign.tgz.b64 > /tmp/ui-redesign.tgz
+          tar -xzf /tmp/ui-redesign.tgz -C /tmp/unpack/S3XYButtonBridgeAndroid
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
