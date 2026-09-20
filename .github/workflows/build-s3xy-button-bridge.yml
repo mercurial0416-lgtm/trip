@@ -11,61 +11,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Rebuild source archive
+      - name: Rebuild full-feature source
         shell: bash
         run: |
-          cat s3xy-bridge/chunk00.b64 s3xy-bridge/chunk01.b64 s3xy-bridge/chunk02.b64 s3xy-bridge/chunk03.b64 > /tmp/src.b64
-          base64 -d /tmp/src.b64 > /tmp/src.zip
-          mkdir -p /tmp/unpack
-          unzip -q /tmp/src.zip -d /tmp/unpack
-          test -f /tmp/unpack/S3XYButtonBridgeAndroid/app/build.gradle
-
-      - name: Patch custom interval UI
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          root=Path('/tmp/unpack/S3XYButtonBridgeAndroid')
-          p=root/'app/src/main/java/com/openai/s3xybridge/MainActivity.java'
-          s=p.read_text()
-          s=s.replace('import android.widget.LinearLayout;\n', 'import android.widget.LinearLayout;\nimport android.widget.EditText;\n')
-          s=s.replace('import android.widget.Spinner;\n', 'import android.widget.Spinner;\nimport android.text.InputType;\n')
-          s=s.replace('    private Spinner intervalSpinner, maxSpinner;\n', '    private EditText intervalInput;\n    private Spinner maxSpinner;\n')
-          s=s.replace('        cfg.addView(label("반복 간격"));\n        intervalSpinner=spinner(new String[]{"250 ms","300 ms","400 ms","500 ms"},1); cfg.addView(intervalSpinner,margins(-1,dp(48),0,0,0,8));',
-          '        cfg.addView(label("토글 간격 (ms) — 직접 입력"));\n        intervalInput=new EditText(this);\n        intervalInput.setInputType(InputType.TYPE_CLASS_NUMBER);\n        intervalInput.setSingleLine(true);\n        intervalInput.setText("120");\n        intervalInput.setHint("예: 80, 120, 175");\n        cfg.addView(intervalInput,margins(-1,dp(52),0,0,0,8));\n        TextView intervalNote=text("입력 범위 20~2000ms. 50ms 미만은 Commander/차량에서 입력이 누락될 수 있습니다.",11,false);\n        intervalNote.setTextColor(Color.DKGRAY);\n        cfg.addView(intervalNote,margins(-1,-2,0,0,0,6));')
-          s=s.replace('        long interval=new long[]{250,300,400,500}[intervalSpinner==null?1:intervalSpinner.getSelectedItemPosition()];\n        long max=new long[]{2000,3000,5000}[maxSpinner==null?1:maxSpinner.getSelectedItemPosition()];\n        bridge.configure(testMode==null||testMode.isChecked(),interval,max);\n        append("config test="+(testMode==null||testMode.isChecked())+" hold-only interval="+interval+"ms max="+max+"ms");',
-          '        long interval=120;\n        try { String raw=intervalInput==null?"120":intervalInput.getText().toString().trim(); interval=Long.parseLong(raw); } catch(Exception ignored) {}\n        interval=Math.max(20,Math.min(2000,interval));\n        if(intervalInput!=null) intervalInput.setText(String.valueOf(interval));\n        long max=new long[]{2000,3000,5000}[maxSpinner==null?1:maxSpinner.getSelectedItemPosition()];\n        bridge.configure(testMode==null||testMode.isChecked(),interval,max);\n        append("config test="+(testMode==null||testMode.isChecked())+" hold-only toggleInterval="+interval+"ms max="+max+"ms");')
-          s=s.replace('사용법: Commander에서 이 앱의 가상 ENH_BTN의 Single에 원하는 기능을 한 번만 지정하세요. 앱 화면에는 Single/Double/Long 설정이 없고, 물리 버튼을 누르는 동안 내부적으로 그 Single 이벤트만 반복 전송합니다. 손을 떼면 즉시 멈추며 최대 반복시간 제한이 있습니다.',
-          '사용법: Commander에서 이 앱의 가상 ENH_BTN의 Single에 토글형 기능을 지정하세요. 버튼을 누르는 동안 설정한 ms 간격으로 동일 펄스를 반복해 ON/OFF 토글을 반복하고, 손을 떼면 즉시 멈춥니다.')
-          p.write_text(s)
-
-          p=root/'app/src/main/java/com/openai/s3xybridge/BridgeController.java'
-          s=p.read_text()
-          s=s.replace('private long repeatIntervalMs=300;', 'private long repeatIntervalMs=120;')
-          s=s.replace('repeatIntervalMs=Math.max(250,interval);', 'repeatIntervalMs=Math.min(2000,Math.max(20,interval));')
-          s=s.replace('HOLD START interval=', 'HOLD TOGGLE START interval=')
-          s=s.replace('hold-repeat', 'hold-toggle')
-          p.write_text(s)
-          PY
-
-      - name: Fix Locale import
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          p=Path('/tmp/unpack/S3XYButtonBridgeAndroid/app/src/main/java/com/openai/s3xybridge/MainActivity.java')
-          s=p.read_text()
-          if 'import java.util.Locale;' not in s:
-              s=s.replace('import java.util.Map;\n', 'import java.util.Map;\nimport java.util.Locale;\n')
-          p.write_text(s)
-          PY
-
-      - name: Apply redesigned UI
-        shell: bash
-        run: |
-          cat s3xy-ui/redesign-0.b64 s3xy-ui/redesign-1.b64 s3xy-ui/redesign-2.b64 s3xy-ui/redesign-3.b64 > /tmp/ui-redesign.b64
-          base64 -d /tmp/ui-redesign.b64 > /tmp/ui-redesign.tgz
-          tar -xzf /tmp/ui-redesign.tgz -C /tmp/unpack/S3XYButtonBridgeAndroid
+          cat s3xy-full/full-00.b64 s3xy-full/full-01.b64 s3xy-full/full-02.b64 > /tmp/full.b64
+          base64 -d /tmp/full.b64 > /tmp/full.tgz
+          mkdir -p /tmp/src
+          tar -xzf /tmp/full.tgz -C /tmp/src
+          test -f /tmp/src/S3XYButtonBridgeAndroid/app/build.gradle
 
       - uses: actions/setup-java@v4
         with:
@@ -77,16 +30,16 @@ jobs:
           gradle-version: '8.9'
 
       - name: Protocol tests
-        working-directory: /tmp/unpack/S3XYButtonBridgeAndroid
+        working-directory: /tmp/src/S3XYButtonBridgeAndroid
         run: bash tools/run_tests.sh
 
       - name: Build debug APK
-        working-directory: /tmp/unpack/S3XYButtonBridgeAndroid
+        working-directory: /tmp/src/S3XYButtonBridgeAndroid
         run: gradle --no-daemon assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: S3XYButtonBridge-debug
-          path: /tmp/unpack/S3XYButtonBridgeAndroid/app/build/outputs/apk/debug/app-debug.apk
+          name: S3XYButtonBridge-fullfeatures-debug
+          path: /tmp/src/S3XYButtonBridgeAndroid/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
