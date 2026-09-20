@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#111827" />
+  <title>Trip Pick — 언제 어디로 갈까?</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="shell">
+    <header class="hero">
+      <span class="badge">TRIP PICK</span>
+      <h1>언제 어디로 갈까?</h1>
+      <p>날짜·예산·날씨·취향을 넣으면 여행 후보를 비교합니다. 항공권은 실제 연결된 데이터만 가격으로 표시합니다.</p>
+    </header>
+
+    <section class="card form-card">
+      <div class="section-head">
+        <div><small>STEP 1</small><h2>여행 조건</h2></div>
+        <button id="presetBtn" class="ghost">내 취향 프리셋</button>
+      </div>
+
+      <div class="grid">
+        <label>출발 공항
+          <select id="origin">
+            <option value="ICN">인천 ICN</option>
+            <option value="GMP">김포 GMP</option>
+          </select>
+        </label>
+        <label>여행 일수
+          <select id="nights">
+            <option value="2">2박 3일</option>
+            <option value="3" selected>3박 4일</option>
+            <option value="4">4박 5일</option>
+            <option value="5">5박 6일</option>
+          </select>
+        </label>
+        <label>가능한 출발일
+          <input id="startDate" type="date" />
+        </label>
+        <label>마지막 출발 가능일
+          <input id="endDate" type="date" />
+        </label>
+        <label>인원
+          <input id="people" type="number" min="1" max="10" value="3" />
+        </label>
+        <label>1인 총예산
+          <div class="money"><input id="budget" type="number" min="100000" step="50000" value="800000" /><span>원</span></div>
+        </label>
+      </div>
+
+      <div class="sliders">
+        <label><span>더위 회피</span><b id="heatV">9</b><input id="heat" type="range" min="0" max="10" value="9" /></label>
+        <label><span>비/악천후 회피</span><b id="rainV">8</b><input id="rain" type="range" min="0" max="10" value="8" /></label>
+        <label><span>밤 산책·술집</span><b id="nightV">9</b><input id="night" type="range" min="0" max="10" value="9" /></label>
+        <label><span>교통 편의</span><b id="transitV">8</b><input id="transit" type="range" min="0" max="10" value="8" /></label>
+      </div>
+
+      <fieldset>
+        <legend>후보 지역</legend>
+        <div id="cityChecks" class="chips"></div>
+      </fieldset>
+
+      <button id="searchBtn" class="primary">여행 후보 계산하기</button>
+      <p class="micro">실시간 항공권 가격 API는 아직 연결하지 않았습니다. 따라서 현재 버전은 항공료를 임의로 추정하지 않습니다.</p>
+    </section>
+
+    <section id="loading" class="loading hidden">날씨와 날짜 조합을 확인하고 있습니다…</section>
+
+    <section id="resultsWrap" class="hidden">
+      <div class="section-head results-title">
+        <div><small>STEP 2</small><h2>추천 결과</h2></div>
+        <span id="dataStamp" class="stamp"></span>
+      </div>
+      <div id="results" class="results"></div>
+    </section>
+
+    <section id="planWrap" class="hidden">
+      <div class="section-head results-title">
+        <div><small>STEP 3</small><h2>3박 4일 자동 일정</h2></div>
+        <button id="closePlan" class="ghost">닫기</button>
+      </div>
+      <div id="plan" class="plan"></div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
