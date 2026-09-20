@@ -20,6 +20,34 @@ jobs:
           unzip -q /tmp/src.zip -d /tmp/unpack
           test -f /tmp/unpack/S3XYButtonBridgeAndroid/app/build.gradle
 
+      - name: Patch custom interval UI
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          root=Path('/tmp/unpack/S3XYButtonBridgeAndroid')
+          p=root/'app/src/main/java/com/openai/s3xybridge/MainActivity.java'
+          s=p.read_text()
+          s=s.replace('import android.widget.LinearLayout;\n', 'import android.widget.LinearLayout;\nimport android.widget.EditText;\n')
+          s=s.replace('import android.widget.Spinner;\n', 'import android.widget.Spinner;\nimport android.text.InputType;\n')
+          s=s.replace('    private Spinner intervalSpinner, maxSpinner;\n', '    private EditText intervalInput;\n    private Spinner maxSpinner;\n')
+          s=s.replace('        cfg.addView(label("반복 간격"));\n        intervalSpinner=spinner(new String[]{"250 ms","300 ms","400 ms","500 ms"},1); cfg.addView(intervalSpinner,margins(-1,dp(48),0,0,0,8));',
+          '        cfg.addView(label("토글 간격 (ms) — 직접 입력"));\n        intervalInput=new EditText(this);\n        intervalInput.setInputType(InputType.TYPE_CLASS_NUMBER);\n        intervalInput.setSingleLine(true);\n        intervalInput.setText("120");\n        intervalInput.setHint("예: 80, 120, 175");\n        cfg.addView(intervalInput,margins(-1,dp(52),0,0,0,8));\n        TextView intervalNote=text("입력 범위 20~2000ms. 50ms 미만은 Commander/차량에서 입력이 누락될 수 있습니다.",11,false);\n        intervalNote.setTextColor(Color.DKGRAY);\n        cfg.addView(intervalNote,margins(-1,-2,0,0,0,6));')
+          s=s.replace('        long interval=new long[]{250,300,400,500}[intervalSpinner==null?1:intervalSpinner.getSelectedItemPosition()];\n        long max=new long[]{2000,3000,5000}[maxSpinner==null?1:maxSpinner.getSelectedItemPosition()];\n        bridge.configure(testMode==null||testMode.isChecked(),interval,max);\n        append("config test="+(testMode==null||testMode.isChecked())+" hold-only interval="+interval+"ms max="+max+"ms");',
+          '        long interval=120;\n        try { String raw=intervalInput==null?"120":intervalInput.getText().toString().trim(); interval=Long.parseLong(raw); } catch(Exception ignored) {}\n        interval=Math.max(20,Math.min(2000,interval));\n        if(intervalInput!=null) intervalInput.setText(String.valueOf(interval));\n        long max=new long[]{2000,3000,5000}[maxSpinner==null?1:maxSpinner.getSelectedItemPosition()];\n        bridge.configure(testMode==null||testMode.isChecked(),interval,max);\n        append("config test="+(testMode==null||testMode.isChecked())+" hold-only toggleInterval="+interval+"ms max="+max+"ms");')
+          s=s.replace('사용법: Commander에서 이 앱의 가상 ENH_BTN의 Single에 원하는 기능을 한 번만 지정하세요. 앱 화면에는 Single/Double/Long 설정이 없고, 물리 버튼을 누르는 동안 내부적으로 그 Single 이벤트만 반복 전송합니다. 손을 떼면 즉시 멈추며 최대 반복시간 제한이 있습니다.',
+          '사용법: Commander에서 이 앱의 가상 ENH_BTN의 Single에 토글형 기능을 지정하세요. 버튼을 누르는 동안 설정한 ms 간격으로 동일 펄스를 반복해 ON/OFF 토글을 반복하고, 손을 떼면 즉시 멈춥니다.')
+          p.write_text(s)
+
+          p=root/'app/src/main/java/com/openai/s3xybridge/BridgeController.java'
+          s=p.read_text()
+          s=s.replace('private long repeatIntervalMs=300;', 'private long repeatIntervalMs=120;')
+          s=s.replace('repeatIntervalMs=Math.max(250,interval);', 'repeatIntervalMs=Math.min(2000,Math.max(20,interval));')
+          s=s.replace('HOLD START interval=', 'HOLD TOGGLE START interval=')
+          s=s.replace('hold-repeat', 'hold-toggle')
+          p.write_text(s)
+          PY
+
       - name: Fix Locale import
         shell: bash
         run: |
