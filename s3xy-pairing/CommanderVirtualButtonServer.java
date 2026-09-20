@@ -50,12 +50,14 @@ public final class CommanderVirtualButtonServer {
     private boolean bondReceiverRegistered;
     private String oldName;
     private final byte[] id="BRIDGE0001".getBytes(StandardCharsets.US_ASCII);
+    private final Runnable closePairingWindow;
 
     public CommanderVirtualButtonServer(Context c, Listener l) {
         context=c.getApplicationContext();
         listener=l;
         manager=(BluetoothManager)context.getSystemService(Context.BLUETOOTH_SERVICE);
         adapter=manager==null?null:manager.getAdapter();
+        closePairingWindow=this::closePairingWindowNow;
     }
 
     public boolean isReady(){return commander!=null&&subscribed;}
@@ -120,12 +122,12 @@ public final class CommanderVirtualButtonServer {
         main.postDelayed(closePairingWindow,20000);
     }
 
-    private final Runnable closePairingWindow=()->{
+    private void closePairingWindowNow(){
         pairingWindow=false;
         listener.onCommanderLog("PAIR pairing window closed");
         if(isReady())listener.onCommanderStatus("Commander 준비 완료");
         else if(advertising)listener.onCommanderStatus("ENH_BTN 광고 중 — Commander에서 버튼 추가");
-    };
+    }
 
     public void stop(){
         main.removeCallbacks(closePairingWindow);
