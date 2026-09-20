@@ -63,7 +63,8 @@ jobs:
       - name: Apply redesigned UI
         shell: bash
         run: |
-          base64 -d s3xy-ui/redesign.tgz.b64 > /tmp/ui-redesign.tgz
+          cat s3xy-ui/redesign-0.b64 s3xy-ui/redesign-1.b64 s3xy-ui/redesign-2.b64 s3xy-ui/redesign-3.b64 > /tmp/ui-redesign.b64
+          base64 -d /tmp/ui-redesign.b64 > /tmp/ui-redesign.tgz
           tar -xzf /tmp/ui-redesign.tgz -C /tmp/unpack/S3XYButtonBridgeAndroid
 
       - uses: actions/setup-java@v4
