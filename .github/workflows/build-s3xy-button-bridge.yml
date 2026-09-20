@@ -20,6 +20,18 @@ jobs:
           unzip -q /tmp/src.zip -d /tmp/unpack
           test -f /tmp/unpack/S3XYButtonBridgeAndroid/app/build.gradle
 
+      - name: Fix Locale import
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('/tmp/unpack/S3XYButtonBridgeAndroid/app/src/main/java/com/openai/s3xybridge/MainActivity.java')
+          s=p.read_text()
+          if 'import java.util.Locale;' not in s:
+              s=s.replace('import java.util.Map;\n', 'import java.util.Map;\nimport java.util.Locale;\n')
+          p.write_text(s)
+          PY
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
