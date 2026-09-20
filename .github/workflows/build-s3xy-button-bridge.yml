@@ -24,6 +24,10 @@ jobs:
         shell: bash
         run: python3 s3xy-updater/patch_updater.py
 
+      - name: Apply pairing/bonding update
+        shell: bash
+        run: python3 s3xy-pairing/patch_pairing.py
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
