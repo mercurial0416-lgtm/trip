@@ -13,7 +13,8 @@ import android.util.Base64InputStream;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import org.json.JSONObject;\nimport org.json.JSONArray;
+import org.json.JSONObject;
+import org.json.JSONArray;
 
 import java.io.File;
 import java.io.FileInputStream;
