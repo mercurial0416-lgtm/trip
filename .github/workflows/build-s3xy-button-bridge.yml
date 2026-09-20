@@ -36,6 +36,10 @@ jobs:
         shell: bash
         run: python3 s3xy-vehicle/patch_pairing_gate_hotfix.py
 
+      - name: Apply no-BT-rename version bump
+        shell: bash
+        run: python3 s3xy-pairing/patch_no_bt_rename_version.py
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
