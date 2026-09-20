@@ -40,11 +40,21 @@ needle='    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPL
 repl=needle+'\n    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />'
 if 'android.permission.INTERNET' not in s:
     s=s.replace(needle,repl)
+if 'android:name=".UpdateFileProvider"' not in s:
+    provider='''        <provider
+            android:name=".UpdateFileProvider"
+            android:authorities="com.openai.s3xybridge.updates"
+            android:exported="false"
+            android:grantUriPermissions="true" />
+'''
+    s=s.replace('    </application>',provider+'    </application>')
 p.write_text(s)
 
 # Add updater class.
 src=Path('s3xy-updater/UpdateManager.java').read_text()
 (root/'app/src/main/java/com/openai/s3xybridge/UpdateManager.java').write_text(src)
+provider_src=Path('s3xy-updater/UpdateFileProvider.java').read_text()
+(root/'app/src/main/java/com/openai/s3xybridge/UpdateFileProvider.java').write_text(provider_src)
 
 # Wire updater into the UI.
 p=root/'app/src/main/java/com/openai/s3xybridge/MainActivity.java'
