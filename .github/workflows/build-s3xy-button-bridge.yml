@@ -11,19 +11,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Rebuild full-feature source
+      - name: Rebuild updater source
         shell: bash
         run: |
-          cat s3xy-full/full-00.b64 s3xy-full/full-01.b64 s3xy-full/full-02.b64 > /tmp/full.b64
-          base64 -d /tmp/full.b64 > /tmp/full.tgz
+          cat s3xy-updater/src-00.b64 s3xy-updater/src-01.b64 s3xy-updater/src-02.b64 s3xy-updater/src-03.b64 > /tmp/updater.b64
+          base64 -d /tmp/updater.b64 > /tmp/updater.tgz
           mkdir -p /tmp/src
-          tar -xzf /tmp/full.tgz -C /tmp/src
+          tar -xzf /tmp/updater.tgz -C /tmp/src
           test -f /tmp/src/S3XYButtonBridgeAndroid/app/build.gradle
-
-      - name: Fix reconnect initialization order
-        shell: bash
-        run: |
-          python3 -c "from pathlib import Path; p=Path('/tmp/src/S3XYButtonBridgeAndroid/app/src/main/java/com/openai/s3xybridge/BridgeEngine.java'); s=p.read_text(); s=s.replace('    private int reconnectAttempt;\\n    private int sessionPulses;', '    private int reconnectAttempt;\\n    private int sessionPulses;\\n    private Runnable reconnectRunnable;'); s=s.replace('        bridge=new BridgeController(commanderServer,this);\\n        bridge.updateSettings(isTestMode(),getInterval(),getMaxMs());', '        bridge=new BridgeController(commanderServer,this);\\n        reconnectRunnable=this::doReconnect;\\n        bridge.updateSettings(isTestMode(),getInterval(),getMaxMs());'); s=s.replace('    private final Runnable reconnectRunnable=()->{\\n        if(!isAutoReconnect()||manualDisconnect||realReady)return;\\n        String addr=prefs.getString(\"last_device\",\"\");if(addr.isEmpty()||adapter==null||!adapter.isEnabled()||!hasConnect())return;\\n        try{log(\"AUTO reconnect -> \"+addr);realClient.connect(adapter.getRemoteDevice(addr));}\\n        catch(Exception e){log(\"AUTO reconnect failed: \"+e.getMessage());scheduleReconnect(nextBackoff());}\\n    };\\n', '    private void doReconnect(){\\n        if(!isAutoReconnect()||manualDisconnect||realReady)return;\\n        String addr=prefs.getString(\"last_device\",\"\");\\n        if(addr.isEmpty()||adapter==null||!adapter.isEnabled()||!hasConnect())return;\\n        try{log(\"AUTO reconnect -> \"+addr);realClient.connect(adapter.getRemoteDevice(addr));}\\n        catch(Exception e){log(\"AUTO reconnect failed: \"+e.getMessage());scheduleReconnect(nextBackoff());}\\n    }\\n'); p.write_text(s)"
 
       - uses: actions/setup-java@v4
         with:
@@ -38,13 +33,13 @@ jobs:
         working-directory: /tmp/src/S3XYButtonBridgeAndroid
         run: bash tools/run_tests.sh
 
-      - name: Build debug APK
+      - name: Build release APK
         working-directory: /tmp/src/S3XYButtonBridgeAndroid
-        run: gradle --no-daemon assembleDebug
+        run: gradle --no-daemon assembleRelease
 
-      - name: Upload APK
+      - name: Upload unsigned APK
         uses: actions/upload-artifact@v4
         with:
-          name: S3XYButtonBridge-fullfeatures-debug
-          path: /tmp/src/S3XYButtonBridgeAndroid/app/build/outputs/apk/debug/app-debug.apk
+          name: S3XYButtonBridge-updater-unsigned
+          path: /tmp/src/S3XYButtonBridgeAndroid/app/build/outputs/apk/release/app-release-unsigned.apk
           if-no-files-found: error
