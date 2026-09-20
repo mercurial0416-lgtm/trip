@@ -26,6 +26,7 @@
           <select id="origin">
             <option value="ICN">인천 ICN</option>
             <option value="GMP">김포 GMP</option>
+            <option value="CJJ">청주 CJJ</option>
           </select>
         </label>
         <label>여행 일수
@@ -63,10 +64,10 @@
       </fieldset>
 
       <button id="searchBtn" class="primary">여행 후보 계산하기</button>
-      <p class="micro">실시간 항공권 가격 API는 아직 연결하지 않았습니다. 따라서 현재 버전은 항공료를 임의로 추정하지 않습니다.</p>
+      <p class="micro">선택한 기간의 모든 여행 날짜 조합을 생성합니다. 실시간 항공권 가격 API가 연결되기 전까지는 날짜별 실제 항공권 검색 링크를 제공합니다.</p>
     </section>
 
-    <section id="loading" class="loading hidden">날씨와 날짜 조합을 확인하고 있습니다…</section>
+    <section id="loading" class="loading hidden">모든 여행 날짜와 날씨 조건을 확인하고 있습니다…</section>
 
     <section id="resultsWrap" class="hidden">
       <div class="section-head results-title">
