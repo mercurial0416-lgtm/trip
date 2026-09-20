@@ -1,3 +1,28 @@
+
+
+p=root/'app/src/main/java/com/openai/s3xybridge/BridgeEngine.java'
+b=p.read_text()
+if 'private Runnable reconnectRunnable;' not in b:
+    b=b.replace('    private int reconnectAttempt;\n    private int sessionPulses;', '    private int reconnectAttempt;\n    private int sessionPulses;\n    private Runnable reconnectRunnable;')
+    b=b.replace('        bridge=new BridgeController(commanderServer,this);\n        bridge.updateSettings(isTestMode(),getInterval(),getMaxMs());', '        bridge=new BridgeController(commanderServer,this);\n        reconnectRunnable=this::doReconnect;\n        bridge.updateSettings(isTestMode(),getInterval(),getMaxMs());')
+    old='''    private final Runnable reconnectRunnable=()->{
+        if(!isAutoReconnect()||manualDisconnect||realReady)return;
+        String addr=prefs.getString("last_device","");if(addr.isEmpty()||adapter==null||!adapter.isEnabled()||!hasConnect())return;
+        try{log("AUTO reconnect -> "+addr);realClient.connect(adapter.getRemoteDevice(addr));}
+        catch(Exception e){log("AUTO reconnect failed: "+e.getMessage());scheduleReconnect(nextBackoff());}
+    };
+'''
+    new='''    private void doReconnect(){
+        if(!isAutoReconnect()||manualDisconnect||realReady)return;
+        String addr=prefs.getString("last_device","");
+        if(addr.isEmpty()||adapter==null||!adapter.isEnabled()||!hasConnect())return;
+        try{log("AUTO reconnect -> "+addr);realClient.connect(adapter.getRemoteDevice(addr));}
+        catch(Exception e){log("AUTO reconnect failed: "+e.getMessage());scheduleReconnect(nextBackoff());}
+    }
+'''
+    if old not in b: raise SystemExit('reconnect block not found')
+    b=b.replace(old,new)
+p.write_text(b)
 from pathlib import Path
 
 root=Path('/tmp/src/S3XYButtonBridgeAndroid')
