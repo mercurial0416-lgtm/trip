@@ -28,6 +28,10 @@ jobs:
         shell: bash
         run: python3 s3xy-pairing/patch_pairing.py
 
+      - name: Apply vehicle auto trigger
+        shell: bash
+        run: python3 s3xy-vehicle/patch_vehicle.py
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
