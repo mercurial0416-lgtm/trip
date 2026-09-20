@@ -32,6 +32,10 @@ jobs:
         shell: bash
         run: python3 s3xy-vehicle/patch_vehicle.py
 
+      - name: Apply pairing gate hotfix
+        shell: bash
+        run: python3 s3xy-vehicle/patch_pairing_gate_hotfix.py
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
