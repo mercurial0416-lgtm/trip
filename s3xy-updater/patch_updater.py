@@ -1,5 +1,8 @@
+from pathlib import Path
 
+root=Path('/tmp/src/S3XYButtonBridgeAndroid')
 
+# Fix reconnect initialization ordering in the verified base source.
 p=root/'app/src/main/java/com/openai/s3xybridge/BridgeEngine.java'
 b=p.read_text()
 if 'private Runnable reconnectRunnable;' not in b:
@@ -23,13 +26,14 @@ if 'private Runnable reconnectRunnable;' not in b:
     if old not in b: raise SystemExit('reconnect block not found')
     b=b.replace(old,new)
 p.write_text(b)
-from pathlib import Path
 
+# Version bump.
 p=root/'app/build.gradle'
 s=p.read_text()
 s=s.replace('versionCode 3','versionCode 4').replace("versionName '0.3.0-full'","versionName '0.4.0-updater'")
 p.write_text(s)
 
+# Updater permissions.
 p=root/'app/src/main/AndroidManifest.xml'
 s=p.read_text()
 needle='    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />'
@@ -38,9 +42,11 @@ if 'android.permission.INTERNET' not in s:
     s=s.replace(needle,repl)
 p.write_text(s)
 
+# Add updater class.
 src=Path('s3xy-updater/UpdateManager.java').read_text()
 (root/'app/src/main/java/com/openai/s3xybridge/UpdateManager.java').write_text(src)
 
+# Wire updater into the UI.
 p=root/'app/src/main/java/com/openai/s3xybridge/MainActivity.java'
 s=p.read_text()
 if 'private UpdateManager updater;' not in s:
