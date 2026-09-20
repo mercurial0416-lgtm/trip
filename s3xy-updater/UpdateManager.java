@@ -13,7 +13,7 @@ import android.util.Base64InputStream;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import org.json.JSONObject;
+import org.json.JSONObject;\nimport org.json.JSONArray;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -47,10 +47,14 @@ final class UpdateManager {
                 int code=c.getResponseCode();
                 if(code<200||code>=300)throw new Exception("HTTP "+code);
                 JSONObject j=new JSONObject(readAll(c.getInputStream()));
+                java.util.ArrayList<String> urls=new java.util.ArrayList<>();
+                JSONArray arr=j.optJSONArray("apkB64Urls");
+                if(arr!=null){for(int i=0;i<arr.length();i++)urls.add(arr.getString(i));}
+                else urls.add(j.getString("apkB64Url"));
                 UpdateInfo info=new UpdateInfo(
                         j.getInt("versionCode"),
                         j.optString("versionName",""),
-                        j.getString("apkB64Url"),
+                        urls.toArray(new String[0]),
                         j.optString("sha256",""),
                         j.optString("notes",""));
                 long current=currentVersionCode();
@@ -112,16 +116,18 @@ final class UpdateManager {
                 File dst=new File(dir,"S3XYButtonBridge-update.apk");
                 if(dst.exists()&&!dst.delete())throw new Exception("이전 업데이트 파일 삭제 실패");
 
-                c=(HttpURLConnection)new URL(info.apkB64Url).openConnection();
-                c.setConnectTimeout(10000);c.setReadTimeout(30000);c.setUseCaches(false);
-                int code=c.getResponseCode();
-                if(code<200||code>=300)throw new Exception("APK HTTP "+code);
-
-                try(InputStream raw=c.getInputStream();
-                    Base64InputStream decoded=new Base64InputStream(raw,Base64.DEFAULT);
-                    FileOutputStream out=new FileOutputStream(dst)){
-                    byte[] buf=new byte[32768];int n;
-                    while((n=decoded.read(buf))>0)out.write(buf,0,n);
+                try(FileOutputStream out=new FileOutputStream(dst)){
+                    byte[] buf=new byte[32768];
+                    for(String partUrl:info.apkB64Urls){
+                        c=(HttpURLConnection)new URL(partUrl).openConnection();
+                        c.setConnectTimeout(10000);c.setReadTimeout(30000);c.setUseCaches(false);
+                        int code=c.getResponseCode();
+                        if(code<200||code>=300)throw new Exception("APK HTTP "+code);
+                        try(InputStream raw=c.getInputStream();
+                            Base64InputStream decoded=new Base64InputStream(raw,Base64.DEFAULT)){
+                            int n;while((n=decoded.read(buf))>0)out.write(buf,0,n);
+                        }finally{c.disconnect();c=null;}
+                    }
                     out.getFD().sync();
                 }
 
@@ -190,9 +196,9 @@ final class UpdateManager {
     void close(){}
 
     private static final class UpdateInfo{
-        final int versionCode;final String versionName,apkB64Url,sha256,notes;
-        UpdateInfo(int c,String n,String u,String h,String notes){
-            versionCode=c;versionName=n;apkB64Url=u;sha256=h;this.notes=notes;
+        final int versionCode;final String versionName,sha256,notes;final String[] apkB64Urls;
+        UpdateInfo(int c,String n,String[] u,String h,String notes){
+            versionCode=c;versionName=n;apkB64Urls=u;sha256=h;this.notes=notes;
         }
     }
 }
