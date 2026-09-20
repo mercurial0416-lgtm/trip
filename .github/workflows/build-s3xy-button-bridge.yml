@@ -41,6 +41,19 @@ jobs:
         working-directory: /tmp/src/S3XYButtonBridgeAndroid
         run: gradle --no-daemon assembleRelease
 
+      - name: Fetch APK signer utility
+        shell: bash
+        run: |
+          curl -fL --retry 3 -o /tmp/apksig.jar https://dl.google.com/dl/android/maven2/com/android/tools/build/apksig/8.7.3/apksig-8.7.3.jar
+          test -s /tmp/apksig.jar
+
+      - name: Upload signer utility
+        uses: actions/upload-artifact@v4
+        with:
+          name: S3XY-apksig-tool
+          path: /tmp/apksig.jar
+          if-no-files-found: error
+
       - name: Upload unsigned APK
         uses: actions/upload-artifact@v4
         with:
