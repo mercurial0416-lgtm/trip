@@ -1,7 +1,23 @@
 {
-  "versionCode": 5,
-  "versionName": "0.5.0-pairing",
-  "apkB64Urls": [],
-  "sha256": "15d72347fd06b551d79899b29636f7b879da0db24bb885645467efb6fada88a8",
-  "notes": "가상 ENH_BTN 페어링 모드, Commander LE 본딩, 페어링 로그 개선"
+  "versionCode": 6,
+  "versionName": "0.6.0-drive-auto",
+  "apkB64Urls": [
+    "https://raw.githubusercontent.com/mercurial0416-lgtm/trip/s3xy-button-bridge-build/s3xy-update/0.6.0.part00.b64",
+    "https://raw.githubusercontent.com/mercurial0416-lgtm/trip/s3xy-button-bridge-build/s3xy-update/0.6.0.part01.b64",
+    "https://raw.githubusercontent.com/mercurial0416-lgtm/trip/s3xy-button-bridge-build/s3xy-update/0.6.0.part02.b64",
+    "https://raw.githubusercontent.com/mercurial0416-lgtm/trip/s3xy-button-bridge-build/s3xy-update/0.6.0.part03.b64",
+    "https://raw.githubusercontent.com/mercurial0416-lgtm/trip/s3xy-button-bridge-build/s3xy-update/0.6.0.part04.b64",
+    "https://raw.githubusercontent.com/mercurial0416-lgtm/trip/s3xy-button-bridge-build/s3xy-update/0.6.0.part05.b64",
+    "https://raw.githubusercontent.com/mercurial0416-lgtm/trip/s3xy-button-bridge-build/s3xy-update/0.6.0.part06.b64",
+    "https://raw.githubusercontent.com/mercurial0416-lgtm/trip/s3xy-button-bridge-build/s3xy-update/0.6.0.part07.b64",
+    "https://raw.githubusercontent.com/mercurial0416-lgtm/trip/s3xy-button-bridge-build/s3xy-update/0.6.0.part08.b64",
+    "https://raw.githubusercontent.com/mercurial0416-lgtm/trip/s3xy-button-bridge-build/s3xy-update/0.6.0.part09.b64",
+    "https://raw.githubusercontent.com/mercurial0416-lgtm/trip/s3xy-button-bridge-build/s3xy-update/0.6.0.part10.b64",
+    "https://raw.githubusercontent.com/mercurial0416-lgtm/trip/s3xy-button-bridge-build/s3xy-update/0.6.0.part11.b64",
+    "https://raw.githubusercontent.com/mercurial0416-lgtm/trip/s3xy-button-bridge-build/s3xy-update/0.6.0.part12.b64",
+    "https://raw.githubusercontent.com/mercurial0416-lgtm/trip/s3xy-button-bridge-build/s3xy-update/0.6.0.part13.b64",
+    "https://raw.githubusercontent.com/mercurial0416-lgtm/trip/s3xy-button-bridge-build/s3xy-update/0.6.0.part14.b64"
+  ],
+  "sha256": "1624dac6ec772545cf46fe1e24f687512dbe2c7e52a8573d735331fe599e09d8",
+  "notes": "차량 Bluetooth 연결 또는 Android 운전모드에서만 S3XY 브리지를 자동 시작하고, 차량 연결 해제 15초 후 자동 종료합니다."
 }
