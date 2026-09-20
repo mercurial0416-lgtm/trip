@@ -33,6 +33,25 @@ jobs:
         with:
           gradle-version: '8.9'
 
+      - name: Patch Java lambda capture
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('/tmp/src/S3XYCommanderLabAndroid/app/src/main/java/com/openai/s3xylab/MainActivity.java')
+          s=p.read_text()
+          old='''            String addr;
+            try { addr = result.getDevice().getAddress(); } catch (Exception e) { addr = "?"; }
+            String tag = classify(displayName);'''
+          new='''            String tmpAddr;
+            try { tmpAddr = result.getDevice().getAddress(); } catch (Exception e) { tmpAddr = "?"; }
+            final String addr = tmpAddr;
+            String tag = classify(displayName);'''
+          if old not in s:
+              raise SystemExit('patch target not found')
+          p.write_text(s.replace(old,new,1))
+          PY
+
       - name: Run protocol self-tests
         working-directory: /tmp/src/S3XYCommanderLabAndroid
         run: bash tools/run_protocol_tests.sh
