@@ -1,0 +1,7 @@
+{
+  "versionCode": 5,
+  "versionName": "0.5.0-pairing",
+  "apkB64Urls": [],
+  "sha256": "15d72347fd06b551d79899b29636f7b879da0db24bb885645467efb6fada88a8",
+  "notes": "가상 ENH_BTN 페어링 모드, Commander LE 본딩, 페어링 로그 개선"
+}
