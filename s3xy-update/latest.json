@@ -1,23 +1,9 @@
 {
-  "versionCode": 6,
-  "versionName": "0.6.0-drive-auto",
+  "versionCode": 7,
+  "versionName": "0.6.1-pairing-hotfix",
   "apkB64Urls": [
-    "https://raw.githubusercontent.com/mercurial0416-lgtm/trip/s3xy-button-bridge-build/s3xy-update/0.6.0.part00.b64",
-    "https://raw.githubusercontent.com/mercurial0416-lgtm/trip/s3xy-button-bridge-build/s3xy-update/0.6.0.part01.b64",
-    "https://raw.githubusercontent.com/mercurial0416-lgtm/trip/s3xy-button-bridge-build/s3xy-update/0.6.0.part02.b64",
-    "https://raw.githubusercontent.com/mercurial0416-lgtm/trip/s3xy-button-bridge-build/s3xy-update/0.6.0.part03.b64",
-    "https://raw.githubusercontent.com/mercurial0416-lgtm/trip/s3xy-button-bridge-build/s3xy-update/0.6.0.part04.b64",
-    "https://raw.githubusercontent.com/mercurial0416-lgtm/trip/s3xy-button-bridge-build/s3xy-update/0.6.0.part05.b64",
-    "https://raw.githubusercontent.com/mercurial0416-lgtm/trip/s3xy-button-bridge-build/s3xy-update/0.6.0.part06.b64",
-    "https://raw.githubusercontent.com/mercurial0416-lgtm/trip/s3xy-button-bridge-build/s3xy-update/0.6.0.part07.b64",
-    "https://raw.githubusercontent.com/mercurial0416-lgtm/trip/s3xy-button-bridge-build/s3xy-update/0.6.0.part08.b64",
-    "https://raw.githubusercontent.com/mercurial0416-lgtm/trip/s3xy-button-bridge-build/s3xy-update/0.6.0.part09.b64",
-    "https://raw.githubusercontent.com/mercurial0416-lgtm/trip/s3xy-button-bridge-build/s3xy-update/0.6.0.part10.b64",
-    "https://raw.githubusercontent.com/mercurial0416-lgtm/trip/s3xy-button-bridge-build/s3xy-update/0.6.0.part11.b64",
-    "https://raw.githubusercontent.com/mercurial0416-lgtm/trip/s3xy-button-bridge-build/s3xy-update/0.6.0.part12.b64",
-    "https://raw.githubusercontent.com/mercurial0416-lgtm/trip/s3xy-button-bridge-build/s3xy-update/0.6.0.part13.b64",
-    "https://raw.githubusercontent.com/mercurial0416-lgtm/trip/s3xy-button-bridge-build/s3xy-update/0.6.0.part14.b64"
+    "https://raw.githubusercontent.com/mercurial0416-lgtm/trip/s3xy-button-bridge-build/s3xy-update/0.6.1.apk.b64"
   ],
-  "sha256": "1624dac6ec772545cf46fe1e24f687512dbe2c7e52a8573d735331fe599e09d8",
-  "notes": "차량 Bluetooth 연결 또는 Android 운전모드에서만 S3XY 브리지를 자동 시작하고, 차량 연결 해제 15초 후 자동 종료합니다."
+  "sha256": "c43401bb6dc131137d30f399000d955ead21f35fa8ce16eacfde3f43c0203d60",
+  "notes": "페어링 25초 동안 차량 Bluetooth 자동 종료를 무시하도록 수정했습니다. 차량 BT/운전모드 자동 연결 기능은 유지됩니다."
 }
