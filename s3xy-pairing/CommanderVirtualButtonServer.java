@@ -48,7 +48,6 @@ public final class CommanderVirtualButtonServer {
     private boolean advertising;
     private boolean pairingWindow;
     private boolean bondReceiverRegistered;
-    private String oldName;
     private final byte[] id="BRIDGE0001".getBytes(StandardCharsets.US_ASCII);
     private final Runnable closePairingWindow;
 
@@ -70,8 +69,6 @@ public final class CommanderVirtualButtonServer {
         }
         stop();
         registerBondReceiver();
-        oldName=adapter.getName();
-        try{adapter.setName("ENH_BTN");}catch(Exception ignored){}
         server=manager.openGattServer(context,callback);
         if(server==null){listener.onCommanderStatus("GATT 서버 생성 실패");return;}
 
@@ -126,7 +123,7 @@ public final class CommanderVirtualButtonServer {
         pairingWindow=false;
         listener.onCommanderLog("PAIR pairing window closed");
         if(isReady())listener.onCommanderStatus("Commander 준비 완료");
-        else if(advertising)listener.onCommanderStatus("ENH_BTN 광고 중 — Commander에서 버튼 추가");
+        else if(advertising)listener.onCommanderStatus("S3XY 서비스 광고 중 — 폰 Bluetooth 이름 변경 없음");
     }
 
     public void stop(){
@@ -146,10 +143,6 @@ public final class CommanderVirtualButtonServer {
         advertiser=null;
         listener.onCommanderReady(false);
         unregisterBondReceiver();
-        if(hasConnect()&&adapter!=null&&oldName!=null){
-            try{adapter.setName(oldName);}catch(Exception ignored){}
-        }
-        oldName=null;
     }
 
     public boolean sendSingle(){
@@ -175,11 +168,12 @@ public final class CommanderVirtualButtonServer {
         // Mirrors the tested virtual-button layout as closely as Android exposes:
         // device name in ADV, complete service UUID in scan response.
         AdvertiseData data=new AdvertiseData.Builder()
-                .setIncludeDeviceName(true)
+                .addServiceUuid(new ParcelUuid(S3xyProtocol.BUTTON_SERVICE))
+                .setIncludeDeviceName(false)
                 .setIncludeTxPowerLevel(false)
                 .build();
         AdvertiseData scan=new AdvertiseData.Builder()
-                .addServiceUuid(new ParcelUuid(S3xyProtocol.BUTTON_SERVICE))
+                .setIncludeDeviceName(false)
                 .build();
 
         advertiser.startAdvertising(st,data,scan,adCallback);
@@ -221,7 +215,7 @@ public final class CommanderVirtualButtonServer {
             advertising=true;
             listener.onCommanderStatus(pairingWindow
                     ?"페어링 모드 — 공식 앱의 '꾹 누르세요' 화면에서 대기"
-                    :"ENH_BTN 광고 중 — Commander에서 버튼 추가");
+                    :"S3XY 서비스 광고 중 — 폰 Bluetooth 이름 변경 없음");
         }
         @Override public void onStartFailure(int e){
             advertising=false;
