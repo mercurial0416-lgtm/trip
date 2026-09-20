@@ -25,8 +25,6 @@ if 'private Runnable reconnectRunnable;' not in b:
 p.write_text(b)
 from pathlib import Path
 
-root=Path('/tmp/src/S3XYButtonBridgeAndroid')
-
 p=root/'app/build.gradle'
 s=p.read_text()
 s=s.replace('versionCode 3','versionCode 4').replace("versionName '0.3.0-full'","versionName '0.4.0-updater'")
