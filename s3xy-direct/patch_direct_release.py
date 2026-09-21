@@ -5,8 +5,8 @@ root=Path('/tmp/src/S3XYButtonBridgeAndroid')
 # Version bump after the existing 0.7.0 Direct Lab patch.
 p=root/'app/build.gradle'
 s=p.read_text()
-s=s.replace('versionCode 12','versionCode 13')
-s=s.replace("versionName '0.7.0-commander-direct-lab'","versionName '0.7.1-direct-connect'")
+s=s.replace('versionCode 12','versionCode 14')
+s=s.replace("versionName '0.7.0-commander-direct-lab'","versionName '0.7.2-direct-connect'")
 if 'versionCode 13' not in s or "versionName '0.7.1-direct-connect'" not in s:
     raise SystemExit('0.7.1 version bump failed')
 p.write_text(s)
@@ -25,7 +25,7 @@ s=s.replace('directScanButton.setText("Commander BLE 검색 (12초)")',
 s=s.replace('if(directScanButton!=null)directScanButton.setText("Commander 검색 중…");\n        directProbe.startScan();',
             'engine.stopCommander();\n        if(directScanButton!=null)directScanButton.setText("Commander 자동 연결 중…");\n        directProbe.startAuto();')
 s=s.replace('b.append("App: 0.7.0-commander-direct-lab\\n\\n");',
-            'b.append("App: 0.7.1-direct-connect\\n\\n");')
+            'b.append("App: 0.7.2-direct-connect\\n\\n");')
 needle='''        engine.ensureRunning();
         refreshProfiles();
 '''
@@ -81,4 +81,4 @@ if 'syncDirect();' not in s:
                 insert+'    @Override public void onSnapshot(BridgeEngine.Snapshot s){')
 p.write_text(s)
 
-print('v0.7.1 Direct Connect release patch applied')
+print('v0.7.2 Direct Connect release patch applied')
