@@ -1,9 +1,9 @@
 {
-  "versionCode": 11,
-  "versionName": "0.6.5-pairing-compat",
+  "versionCode": 12,
+  "versionName": "0.7.0-commander-direct-lab",
   "apkB64Urls": [
-    "https://raw.githubusercontent.com/mercurial0416-lgtm/trip/s3xy-button-bridge-build/s3xy-update/0.6.5.apk.b64"
+    "https://raw.githubusercontent.com/mercurial0416-lgtm/trip/s3xy-button-bridge-build/s3xy-update/0.7.0.apk.b64"
   ],
-  "sha256": "47cebd96f84c90730131438f705253ee88089f2fa557682feaae231636b7e1f8",
-  "notes": "Commander 페어링 호환성을 강화했습니다. 페어링 30초 동안만 ENH_BTN 이름을 광고하고 즉시 원복하며, 폰의 선제 본딩을 제거했습니다. B6 핸드셰이크 응답을 CCCD 구독 전에도 보관해 유실되지 않게 했고, 초기 연결 끊김이 반복되면 plain-GATT 호환 모드로 자동 재시도합니다."
+  "sha256": "233a04efd6de2ddbe9caa701929f6c424b608aef8adf1fa949f71e31f0607628",
+  "notes": "Commander Direct Lab 추가: 폰이 Commander에 직접 BLE 연결하여 실제 GATT 서비스/특성 UUID, 읽기값, notify/indicate 패킷을 자동 수집합니다. 기존 실물 S3XY Button 브리지 기능은 유지됩니다. Direct Lab은 검증 전 임의 차량 제어 write를 보내지 않습니다."
 }
