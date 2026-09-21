@@ -1,0 +1,57 @@
+name: Build S3XY ESP32 Hardware Bridge
+
+on:
+  push:
+    branches: [s3xy-button-bridge-build]
+    paths:
+      - 's3xy-esp32-bridge/**'
+      - '.github/workflows/build-s3xy-esp32-bridge.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: s3xy-esp32-bridge
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install PlatformIO
+        run: pip install platformio==6.1.18
+
+      - name: Build firmware
+        run: pio run -e esp32dev
+
+      - name: Merge flash image
+        shell: bash
+        run: |
+          BOOTLOADER=.pio/build/esp32dev/bootloader.bin
+          PARTITIONS=.pio/build/esp32dev/partitions.bin
+          APP=.pio/build/esp32dev/firmware.bin
+          BOOTAPP=$HOME/.platformio/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin
+          python "$HOME/.platformio/packages/tool-esptoolpy/esptool.py" --chip esp32 merge_bin -o S3XY-ESP32-Bridge-merged.bin \
+            --flash_mode dio --flash_size 4MB \
+            0x1000 "$BOOTLOADER" \
+            0x8000 "$PARTITIONS" \
+            0xe000 "$BOOTAPP" \
+            0x10000 "$APP"
+          sha256sum S3XY-ESP32-Bridge-merged.bin | tee S3XY-ESP32-Bridge-merged.sha256
+
+      - name: Package source
+        shell: bash
+        run: |
+          tar -czf S3XY-ESP32-Bridge-source.tgz platformio.ini src README.md THIRD_PARTY_NOTICES.md
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: S3XY-ESP32-Bridge
+          path: |
+            s3xy-esp32-bridge/S3XY-ESP32-Bridge-merged.bin
+            s3xy-esp32-bridge/S3XY-ESP32-Bridge-merged.sha256
+            s3xy-esp32-bridge/S3XY-ESP32-Bridge-source.tgz
+          if-no-files-found: error
