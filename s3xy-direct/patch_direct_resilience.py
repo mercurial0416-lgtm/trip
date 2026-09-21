@@ -70,6 +70,8 @@ s=s.replace(
 
 # Once a Commander has connected successfully its address is persisted. Prefer that exact
 # device on later scans so a nearby S3XY Button/other ENH_* device cannot win the race.
+# On first use, explicitly reject names that identify the physical button. Both devices can
+# use ENH_* advertising names, so the previous broad name match could connect to the button.
 old='''        if(!connected&&!autoConnecting&&r.getRssi()>-82){
             autoConnecting=true;
             log("DIRECT auto-select Commander -> "+name+" "+addr);
@@ -78,11 +80,14 @@ old='''        if(!connected&&!autoConnecting&&r.getRssi()>-82){
 '''
 new='''        String saved=prefs.getString("direct_commander_addr","");
         boolean savedMatch=!saved.isEmpty()&&saved.equalsIgnoreCase(addr);
-        boolean mayAuto=saved.isEmpty()||savedMatch;
+        boolean looksButton=lower.contains("enh_btn")||lower.contains("button")||lower.contains("s3xy btn");
+        boolean mayAuto=savedMatch||(saved.isEmpty()&&!looksButton);
         if(!connected&&!autoConnecting&&r.getRssi()>-82&&mayAuto){
             autoConnecting=true;
             log("DIRECT auto-select Commander -> "+name+" "+addr+(savedMatch?" [saved]":" [first-use]"));
             main.post(()->connectInternal(d));
+        }else if(looksButton){
+            log("DIRECT skip physical-button candidate -> "+name+" "+addr);
         }else if(!saved.isEmpty()&&!savedMatch){
             log("DIRECT skip non-saved candidate -> "+name+" "+addr);
         }
@@ -91,7 +96,7 @@ if old not in s:
     raise SystemExit('auto-select block missing')
 s=s.replace(old,new,1)
 
-required=['CONNECT_TIMEOUT_MS=15000L','connect timeout; reset GATT and rescan','skip non-saved candidate']
+required=['CONNECT_TIMEOUT_MS=15000L','connect timeout; reset GATT and rescan','skip non-saved candidate','skip physical-button candidate']
 for token in required:
     if token not in s: raise SystemExit('resilience patch failed: '+token)
 
