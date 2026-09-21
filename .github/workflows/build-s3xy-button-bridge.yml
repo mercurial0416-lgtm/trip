@@ -40,6 +40,10 @@ jobs:
         shell: bash
         run: python3 s3xy-pairing/patch_no_bt_rename_version.py
 
+      - name: Apply reconnect resilience
+        shell: bash
+        run: python3 s3xy-resilience/patch_resilience.py
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
