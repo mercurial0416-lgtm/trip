@@ -1,9 +1,9 @@
 {
-  "versionCode": 8,
-  "versionName": "0.6.2-no-bt-rename",
+  "versionCode": 9,
+  "versionName": "0.6.3-resilience",
   "apkB64Urls": [
-    "https://raw.githubusercontent.com/mercurial0416-lgtm/trip/s3xy-button-bridge-build/s3xy-update/0.6.2.apk.b64"
+    "https://raw.githubusercontent.com/mercurial0416-lgtm/trip/s3xy-button-bridge-build/s3xy-update/0.6.3.apk.b64"
   ],
-  "sha256": "f8043bb4a0b275a2c04cf2578f972d44b1fff1c15692331709c93c00f8cea203",
-  "notes": "페어링 중 폰 Bluetooth 이름을 ENH_BTN으로 바꾸던 동작을 제거했습니다. 기존 Commander/차량 Bluetooth 연결을 유지한 채 S3XY 서비스 UUID만 광고합니다."
+  "sha256": "a7fce28425c6b2717954e45167f31b8e3ff12875abac8586be4b2f23fad25cf1",
+  "notes": "BLE 자동복구를 강화했습니다. 오래된 GATT 콜백 차단, 30초 연결 타임아웃, Bluetooth OFF/ON 후 재접속 복구, 중복 재연결 방지, 재시도 백오프 개선, 반복 끊김 알림 방지."
 }
