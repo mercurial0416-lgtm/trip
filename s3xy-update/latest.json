@@ -1,9 +1,9 @@
 {
-  "versionCode": 7,
-  "versionName": "0.6.1-pairing-hotfix",
+  "versionCode": 8,
+  "versionName": "0.6.2-no-bt-rename",
   "apkB64Urls": [
-    "https://raw.githubusercontent.com/mercurial0416-lgtm/trip/s3xy-button-bridge-build/s3xy-update/0.6.1.apk.b64"
+    "https://raw.githubusercontent.com/mercurial0416-lgtm/trip/s3xy-button-bridge-build/s3xy-update/0.6.2.apk.b64"
   ],
-  "sha256": "c43401bb6dc131137d30f399000d955ead21f35fa8ce16eacfde3f43c0203d60",
-  "notes": "페어링 25초 동안 차량 Bluetooth 자동 종료를 무시하도록 수정했습니다. 차량 BT/운전모드 자동 연결 기능은 유지됩니다."
+  "sha256": "f8043bb4a0b275a2c04cf2578f972d44b1fff1c15692331709c93c00f8cea203",
+  "notes": "페어링 중 폰 Bluetooth 이름을 ENH_BTN으로 바꾸던 동작을 제거했습니다. 기존 Commander/차량 Bluetooth 연결을 유지한 채 S3XY 서비스 UUID만 광고합니다."
 }
