@@ -61,6 +61,19 @@ jobs:
         with:
           gradle-version: '8.9'
 
+      - name: Package patched source snapshot
+        shell: bash
+        run: |
+          cd /tmp/src
+          tar -czf /tmp/S3XYButtonBridge-patched-source.tgz S3XYButtonBridgeAndroid
+
+      - name: Upload patched source snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: S3XYButtonBridge-patched-source
+          path: /tmp/S3XYButtonBridge-patched-source.tgz
+          if-no-files-found: error
+
       - name: Protocol tests
         working-directory: /tmp/src/S3XYButtonBridgeAndroid
         run: bash tools/run_tests.sh
