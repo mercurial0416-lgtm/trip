@@ -15,7 +15,7 @@ import android.bluetooth.le.ScanCallback;
 import android.bluetooth.le.ScanRecord;
 import android.bluetooth.le.ScanResult;
 import android.content.Context;
-import android.content.pm.PackageManager;
+import android.content.pm.PackageManager;\nimport android.content.SharedPreferences;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
@@ -26,7 +26,7 @@ import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
+import java.util.Set;\nimport java.util.concurrent.CopyOnWriteArrayList;
 import java.util.UUID;
 
 /**
@@ -48,8 +48,15 @@ public final class CommanderDirectProbe {
     private static final UUID CCCD=UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
     private static final UUID COMMANDER_SERVICE=UUID.fromString("5857a678-87c6-11eb-8dcd-0242ac130003");
 
+    private static CommanderDirectProbe INSTANCE;
+    public static synchronized CommanderDirectProbe get(Context c){
+        if(INSTANCE==null)INSTANCE=new CommanderDirectProbe(c.getApplicationContext());
+        return INSTANCE;
+    }
+
     private final Context context;
-    private final Listener listener;
+    private final CopyOnWriteArrayList<Listener> listeners=new CopyOnWriteArrayList<>();
+    private final SharedPreferences prefs;
     private final BluetoothAdapter adapter;
     private final Handler main=new Handler(Looper.getMainLooper());
     private final StringBuilder report=new StringBuilder();
@@ -62,7 +69,7 @@ public final class CommanderDirectProbe {
     private boolean scanning;
     private boolean connected;
     private boolean opBusy;
-    private boolean autoConnecting;
+    private boolean autoConnecting;\n    private boolean wanted;
 
     private static final class Op {
         static final int READ=1, SUBSCRIBE=2;
@@ -71,12 +78,22 @@ public final class CommanderDirectProbe {
         Op(int type,BluetoothGattCharacteristic c){this.type=type;this.characteristic=c;}
     }
 
-    public CommanderDirectProbe(Context c, Listener l){
+    private CommanderDirectProbe(Context c){
         context=c.getApplicationContext();
-        listener=l;
+        prefs=context.getSharedPreferences("s3xy_bridge",Context.MODE_PRIVATE);
         BluetoothManager manager=(BluetoothManager)context.getSystemService(Context.BLUETOOTH_SERVICE);
         adapter=manager==null?null:manager.getAdapter();
         log("DIRECT probe created");
+    }
+
+    public void attach(Listener l){if(l!=null&&!listeners.contains(l))listeners.add(l);}
+    public void detach(Listener l){if(l!=null)listeners.remove(l);}
+    public boolean isWanted(){return wanted;}
+
+    public void startAuto(){
+        wanted=true;
+        if(connected||autoConnecting||scanning)return;
+        startScan();
     }
 
     public boolean isConnected(){return connected;}
@@ -84,6 +101,8 @@ public final class CommanderDirectProbe {
     public String report(){synchronized(report){return report.toString();}}
 
     public void startScan(){
+        wanted=true;
+        main.removeCallbacks(scanRetryRunnable);
         if(!hasScan()||!hasConnect()){status("Bluetooth 권한 필요",false);return;}
         if(adapter==null||!adapter.isEnabled()){status("Bluetooth를 켜세요",false);return;}
         stopScan();
@@ -96,7 +115,7 @@ public final class CommanderDirectProbe {
         log("DIRECT scan start 12s");
         try{
             scanner.startScan(scanCallback);
-            main.postDelayed(this::stopScan,SCAN_MS);
+            main.postDelayed(stopScanRunnable,SCAN_MS);
         }catch(Exception e){
             scanning=false;
             log("DIRECT scan error: "+e);
@@ -112,17 +131,25 @@ public final class CommanderDirectProbe {
             try{scanner.stopScan(scanCallback);}catch(Exception ignored){}
         }
         log("DIRECT scan stop");
-        if(!connected)status("검색 완료 · Commander를 선택하세요",false);
+        if(!connected){
+            status(wanted?"Commander 재검색 대기":"Commander 직접 연결 대기",false);
+            if(wanted&&!autoConnecting){main.removeCallbacks(scanRetryRunnable);main.postDelayed(scanRetryRunnable,2500);}
+        }
     }
 
-    private final Runnable stopScanRunnable=this::stopScan;
+    private final Runnable stopScanRunnable=this::stopScan;\n    private final Runnable scanRetryRunnable=()->{if(wanted&&!connected&&!autoConnecting)startScan();};
 
     public void connect(BluetoothDevice d){
+        wanted=true;
+        connectInternal(d);
+    }
+
+    private void connectInternal(BluetoothDevice d){
         if(d==null||!hasConnect()){status("Commander 연결 권한 필요",false);return;}
-        stopScan();
-        disconnect();
-        device=d;
         autoConnecting=true;
+        stopScan();
+        closeGatt();
+        device=d;
         String label=safeName(d)+" "+safeAddr(d);
         log("DIRECT connect -> "+label);
         status("Commander 직접 연결 중…",false);
@@ -144,17 +171,31 @@ public final class CommanderDirectProbe {
     }
 
     public void disconnect(){
-        ops.clear();opBusy=false;connected=false;
+        wanted=false;
+        main.removeCallbacks(scanRetryRunnable);
+        stopScan();
+        closeGatt();
+        device=null;
+        status("Commander 직접 연결 대기",false);
+    }
+
+    private void closeGatt(){
+        ops.clear();opBusy=false;connected=false;autoConnecting=false;
         BluetoothGatt old=gatt;gatt=null;
         if(old!=null&&hasConnect()){
             try{old.disconnect();}catch(Exception ignored){}
             try{old.close();}catch(Exception ignored){}
         }
-        device=null;
-        status("Commander 직접 연결 대기",false);
     }
 
-    public void close(){stopScan();disconnect();}
+    public void close(){
+        wanted=false;
+        main.removeCallbacks(scanRetryRunnable);
+        main.removeCallbacks(stopScanRunnable);
+        stopScan();
+        closeGatt();
+        device=null;
+    }
 
     private final ScanCallback scanCallback=new ScanCallback(){
         @Override public void onScanResult(int callbackType, ScanResult result){handleScan(result);}
@@ -202,13 +243,14 @@ public final class CommanderDirectProbe {
 
         String lower=name.toLowerCase(Locale.ROOT);
         boolean likely=lower.contains("commander")||lower.contains("s3xy")||lower.contains("enhance")||lower.contains("enhauto")||lower.contains("enh_");
-        log("DIRECT scan "+(likely?"LIKELY ":"")+"name="+name+" addr="+addr+" rssi="+r.getRssi()+" adv="+adv);
-        listener.onDirectDevice(d,name,r.getRssi(),adv.toString());
         boolean commanderUuid=adv.toString().toLowerCase(Locale.ROOT).contains(COMMANDER_SERVICE.toString());
-        if(!connected&&!autoConnecting&&(likely||commanderUuid)&&r.getRssi()>-75){
+        if(!(likely||commanderUuid))return;
+        log("DIRECT scan LIKELY name="+name+" addr="+addr+" rssi="+r.getRssi()+" adv="+adv);
+        emitDevice(d,name,r.getRssi(),adv.toString());
+        if(!connected&&!autoConnecting&&r.getRssi()>-82){
             autoConnecting=true;
             log("DIRECT auto-select Commander -> "+name+" "+addr);
-            main.post(()->connect(d));
+            main.post(()->connectInternal(d));
         }
     }
 
@@ -219,6 +261,7 @@ public final class CommanderDirectProbe {
             if(newState==BluetoothProfile.STATE_CONNECTED&&statusCode==BluetoothGatt.GATT_SUCCESS){
                 connected=true;
                 autoConnecting=false;
+                if(device!=null&&hasConnect())prefs.edit().putString("direct_commander_addr",safeAddr(device)).apply();
                 status("Commander 연결됨 · GATT 확인 중",true);
                 try{source.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH);}catch(Exception ignored){}
                 try{source.requestMtu(517);}catch(Exception ignored){}
@@ -229,6 +272,7 @@ public final class CommanderDirectProbe {
             }else if(newState==BluetoothProfile.STATE_DISCONNECTED){
                 connected=false;autoConnecting=false;ops.clear();opBusy=false;
                 status("Commander 직접 연결 끊김 · status="+statusCode,false);
+                if(wanted){main.removeCallbacks(scanRetryRunnable);main.postDelayed(scanRetryRunnable,1200);}
             }else if(statusCode!=BluetoothGatt.GATT_SUCCESS){
                 status("Commander GATT 오류="+statusCode,false);
             }
@@ -350,7 +394,7 @@ public final class CommanderDirectProbe {
     }
 
     private void status(String s,boolean ok){
-        listener.onDirectStatus(s,ok);
+        for(Listener l:listeners)try{l.onDirectStatus(s,ok);}catch(Exception ignored){}
         log("DIRECT STATUS "+s);
     }
 
@@ -360,7 +404,11 @@ public final class CommanderDirectProbe {
             report.append(line).append('\n');
             if(report.length()>180000)report.delete(0,40000);
         }
-        listener.onDirectLog(line);
+        for(Listener l:listeners)try{l.onDirectLog(line);}catch(Exception ignored){}
+    }
+
+    private void emitDevice(BluetoothDevice d,String label,int rssi,String adv){
+        for(Listener l:listeners)try{l.onDirectDevice(d,label,rssi,adv);}catch(Exception ignored){}
     }
 
     private boolean hasScan(){return Build.VERSION.SDK_INT<31||context.checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN)==PackageManager.PERMISSION_GRANTED;}
