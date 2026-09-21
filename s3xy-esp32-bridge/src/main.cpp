@@ -44,8 +44,8 @@ static uint32_t gNextPulseAt = 0;
 static uint8_t gVirtualId[10] = {'S','A','B','R','I','N','A','S','N','S'};
 
 static void startCommanderAdvertising();
-static void connectFoundRealButton();
 static void sendCommanderSingle();
+static void clearAllBonds();
 static void stopHold(const char* why);
 static void tryRealHandshake();
 
@@ -352,11 +352,8 @@ static bool prepareRealButtonConnection() {
   }
 
   if (gRealNotify->canNotify()) {
-    if (!gRealNotify->registerForNotify(realNotifyCallback)) {
-      Serial.println("[BTN] notify subscription failed");
-      gRealClient->disconnect();
-      return false;
-    }
+    gRealNotify->registerForNotify(realNotifyCallback);
+    Serial.println("[BTN] notify subscription requested");
   } else {
     Serial.println("[BTN] notify characteristic is not notifiable");
     gRealClient->disconnect();
@@ -365,7 +362,8 @@ static bool prepareRealButtonConnection() {
 
   // Force Secure Connections/Bonding with the physical button. The encrypted
   // 3D49 write below is retried until the C7 handshake acknowledgement arrives.
-  esp_ble_set_encryption(addr.getNative(), ESP_BLE_SEC_ENCRYPT_NO_MITM);
+  esp_err_t enc = esp_ble_set_encryption(*addr.getNative(), ESP_BLE_SEC_ENCRYPT_NO_MITM);
+  Serial.printf("[BTN] encryption request=%d\n", (int)enc);
   gLastHandshakeAt = 0;
   delay(300);
   tryRealHandshake();
@@ -430,6 +428,33 @@ static void processHold() {
   }
 }
 
+static void clearAllBonds() {
+  int count = esp_ble_get_bond_device_num();
+  if (count <= 0) {
+    Serial.println("[SEC] no stored bonds");
+    return;
+  }
+
+  esp_ble_bond_dev_t* list =
+      (esp_ble_bond_dev_t*)calloc((size_t)count, sizeof(esp_ble_bond_dev_t));
+  if (!list) {
+    Serial.println("[SEC] bond list allocation failed");
+    return;
+  }
+
+  int actual = count;
+  esp_err_t result = esp_ble_get_bond_device_list(&actual, list);
+  if (result == ESP_OK) {
+    for (int i = 0; i < actual; ++i) {
+      esp_err_t r = esp_ble_remove_bond_device(list[i].bd_addr);
+      Serial.printf("[SEC] remove bond %d/%d result=%d\n", i + 1, actual, (int)r);
+    }
+  } else {
+    Serial.printf("[SEC] get bond list failed=%d\n", (int)result);
+  }
+  free(list);
+}
+
 static void processSerial() {
   if (!Serial.available()) return;
   String cmd = Serial.readStringUntil('\n');
@@ -448,7 +473,7 @@ static void processSerial() {
     Serial.println("[CLI] scan requested");
   } else if (cmd == "reset") {
     Serial.println("[CLI] deleting all BLE bonds and rebooting");
-    BLEDevice::deleteAllBonds();
+    clearAllBonds();
     delay(300);
     ESP.restart();
   }
@@ -487,7 +512,7 @@ void setup() {
 
   if (digitalRead(BOOT_BUTTON) == LOW) {
     Serial.println("[BOOT] BOOT held: clearing all BLE bonds");
-    BLEDevice::deleteAllBonds();
+    clearAllBonds();
     delay(500);
   }
 
