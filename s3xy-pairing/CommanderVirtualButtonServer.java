@@ -18,6 +18,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Handler;
@@ -25,6 +26,7 @@ import android.os.Looper;
 import android.os.ParcelUuid;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayDeque;
 import java.util.Arrays;
 
 public final class CommanderVirtualButtonServer {
@@ -34,10 +36,14 @@ public final class CommanderVirtualButtonServer {
         void onCommanderReady(boolean ready);
     }
 
+    private static final long PAIRING_WINDOW_MS=30000L;
+    private static final int EARLY_DISCONNECTS_FOR_COMPAT=2;
+
     private final Context context;
     private final Listener listener;
     private final BluetoothManager manager;
     private final BluetoothAdapter adapter;
+    private final SharedPreferences prefs;
     private final Handler main=new Handler(Looper.getMainLooper());
 
     private BluetoothGattServer server;
@@ -48,7 +54,11 @@ public final class CommanderVirtualButtonServer {
     private boolean advertising;
     private boolean pairingWindow;
     private boolean bondReceiverRegistered;
+    private boolean compatibilityMode;
+    private int earlyDisconnects;
+    private String savedAdapterName;
     private final byte[] id="BRIDGE0001".getBytes(StandardCharsets.US_ASCII);
+    private final ArrayDeque<byte[]> pendingNotifications=new ArrayDeque<>();
     private final Runnable closePairingWindow;
 
     public CommanderVirtualButtonServer(Context c, Listener l) {
@@ -56,6 +66,8 @@ public final class CommanderVirtualButtonServer {
         listener=l;
         manager=(BluetoothManager)context.getSystemService(Context.BLUETOOTH_SERVICE);
         adapter=manager==null?null:manager.getAdapter();
+        prefs=context.getSharedPreferences("bridge_prefs",Context.MODE_PRIVATE);
+        compatibilityMode=prefs.getBoolean("commander_plain_gatt",false);
         closePairingWindow=this::closePairingWindowNow;
     }
 
@@ -67,8 +79,30 @@ public final class CommanderVirtualButtonServer {
         if(adapter==null||!adapter.isEnabled()||!adapter.isMultipleAdvertisementSupported()){
             listener.onCommanderStatus("BLE 광고 미지원 또는 Bluetooth 꺼짐");return;
         }
-        stop();
+        closeServerOnly();
         registerBondReceiver();
+        openServer();
+    }
+
+    public void beginPairingWindow(){
+        pairingWindow=true;
+        earlyDisconnects=0;
+        pendingNotifications.clear();
+        main.removeCallbacks(closePairingWindow);
+        listener.onCommanderLog("PAIR pairing window opened (30s) compat="+compatibilityMode);
+        enablePairingIdentity();
+
+        if(server==null){
+            start();
+        }else{
+            restartAdvertisingDelayed(300);
+        }
+        listener.onCommanderStatus("페어링 모드 — 공식 S3XY 앱의 버튼 추가 화면에서 대기");
+        main.postDelayed(closePairingWindow,PAIRING_WINDOW_MS);
+    }
+
+    private void openServer(){
+        if(manager==null){listener.onCommanderStatus("Bluetooth manager 없음");return;}
         server=manager.openGattServer(context,callback);
         if(server==null){listener.onCommanderStatus("GATT 서버 생성 실패");return;}
 
@@ -82,59 +116,56 @@ public final class CommanderVirtualButtonServer {
                 S3xyProtocol.CCCD,
                 BluetoothGattDescriptor.PERMISSION_READ|BluetoothGattDescriptor.PERMISSION_WRITE));
 
+        int idPerm=compatibilityMode
+                ? BluetoothGattCharacteristic.PERMISSION_READ|BluetoothGattCharacteristic.PERMISSION_WRITE
+                : BluetoothGattCharacteristic.PERMISSION_READ_ENCRYPTED|BluetoothGattCharacteristic.PERMISSION_WRITE_ENCRYPTED;
         BluetoothGattCharacteristic idChar=new BluetoothGattCharacteristic(
                 S3xyProtocol.BUTTON_ID,
                 BluetoothGattCharacteristic.PROPERTY_READ|BluetoothGattCharacteristic.PROPERTY_WRITE,
-                BluetoothGattCharacteristic.PERMISSION_READ_ENCRYPTED|BluetoothGattCharacteristic.PERMISSION_WRITE_ENCRYPTED);
+                idPerm);
         idChar.setValue(Arrays.copyOf(id,id.length));
         svc.addCharacteristic(notifyChar);
         svc.addCharacteristic(idChar);
 
         if(!server.addService(svc)){
             listener.onCommanderStatus("GATT 서비스 등록 실패");
-            stop();
+            closeServerOnly();
         }else{
-            listener.onCommanderStatus("Commander용 가상 버튼 준비 중…");
+            listener.onCommanderStatus(compatibilityMode
+                    ?"Commander용 가상 버튼 준비 중 · 호환 모드"
+                    :"Commander용 가상 버튼 준비 중…");
         }
-    }
-
-    /**
-     * Real S3XY buttons are put into discoverable/pairable state by holding them.
-     * The virtual implementation is already connectable, so this restarts the
-     * advertisement and proactively requests LE bonding as soon as Commander connects.
-     */
-    public void beginPairingWindow(){
-        pairingWindow=true;
-        listener.onCommanderLog("PAIR pairing window opened (20s)");
-        if(server==null){
-            start();
-        }else if(commander!=null){
-            listener.onCommanderStatus("페어링 모드 — Commander 본딩 요청 중");
-            requestBond(commander);
-        }else{
-            restartAdvertising();
-            listener.onCommanderStatus("페어링 모드 — 공식 앱에서 버튼 추가를 진행하세요");
-        }
-        main.removeCallbacks(closePairingWindow);
-        main.postDelayed(closePairingWindow,20000);
     }
 
     private void closePairingWindowNow(){
+        main.removeCallbacks(closePairingWindow);
         pairingWindow=false;
+        restoreAdapterName();
         listener.onCommanderLog("PAIR pairing window closed");
         if(isReady())listener.onCommanderStatus("Commander 준비 완료");
-        else if(advertising)listener.onCommanderStatus("S3XY 서비스 광고 중 — 폰 Bluetooth 이름 변경 없음");
+        else{
+            restartAdvertisingDelayed(250);
+            listener.onCommanderStatus("S3XY 서비스 광고 중");
+        }
     }
 
     public void stop(){
         main.removeCallbacks(closePairingWindow);
         pairingWindow=false;
+        closeServerOnly();
+        restoreAdapterName();
+        unregisterBondReceiver();
+        listener.onCommanderReady(false);
+    }
+
+    private void closeServerOnly(){
         if(hasAdvertise()&&advertiser!=null&&advertising){
             try{advertiser.stopAdvertising(adCallback);}catch(Exception ignored){}
         }
         advertising=false;
         subscribed=false;
         commander=null;
+        pendingNotifications.clear();
         if(hasConnect()&&server!=null){
             try{server.close();}catch(Exception ignored){}
         }
@@ -142,7 +173,6 @@ public final class CommanderVirtualButtonServer {
         notifyChar=null;
         advertiser=null;
         listener.onCommanderReady(false);
-        unregisterBondReceiver();
     }
 
     public boolean sendSingle(){
@@ -154,7 +184,7 @@ public final class CommanderVirtualButtonServer {
     public boolean sendLong(){if(!isReady())return false;notifyBytes(S3xyProtocol.longPress());return true;}
 
     private void advertise(){
-        if(!hasAdvertise()||adapter==null||advertising)return;
+        if(!hasAdvertise()||adapter==null||advertising||server==null)return;
         advertiser=adapter.getBluetoothLeAdvertiser();
         if(advertiser==null){listener.onCommanderStatus("BLE advertiser 없음");return;}
 
@@ -165,94 +195,131 @@ public final class CommanderVirtualButtonServer {
                 .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
                 .build();
 
-        // Mirrors the tested virtual-button layout as closely as Android exposes:
-        // device name in ADV, complete service UUID in scan response.
-        AdvertiseData data=new AdvertiseData.Builder()
-                .addServiceUuid(new ParcelUuid(S3xyProtocol.BUTTON_SERVICE))
-                .setIncludeDeviceName(false)
-                .setIncludeTxPowerLevel(false)
-                .build();
-        AdvertiseData scan=new AdvertiseData.Builder()
-                .setIncludeDeviceName(false)
-                .build();
-
-        advertiser.startAdvertising(st,data,scan,adCallback);
-    }
-
-    private void restartAdvertising(){
-        if(!hasAdvertise()||adapter==null)return;
-        try{
-            if(advertiser!=null&&advertising)advertiser.stopAdvertising(adCallback);
-        }catch(Exception ignored){}
-        advertising=false;
-        advertise();
-    }
-
-    private void requestBond(BluetoothDevice d){
-        if(d==null||!hasConnect())return;
-        try{
-            int state=d.getBondState();
-            listener.onCommanderLog("PAIR bond state="+bondState(state)+" "+safeAddr(d));
-            if(state==BluetoothDevice.BOND_BONDED){
-                listener.onCommanderStatus("Commander 본딩 완료 — 알림 구독 대기");
-                return;
-            }
-            if(state==BluetoothDevice.BOND_BONDING){
-                listener.onCommanderStatus("Commander 본딩 진행 중…");
-                return;
-            }
-            boolean started=d.createBond();
-            listener.onCommanderLog("PAIR createBond()="+started);
-            listener.onCommanderStatus(started?"Commander 본딩 시작…":"Commander 본딩 요청 실패 — 다시 시도");
-        }catch(Exception e){
-            listener.onCommanderLog("PAIR createBond error: "+e.getMessage());
-            listener.onCommanderStatus("Commander 본딩 오류");
+        final AdvertiseData data;
+        final AdvertiseData scan;
+        if(pairingWindow){
+            data=new AdvertiseData.Builder()
+                    .setIncludeDeviceName(true)
+                    .setIncludeTxPowerLevel(false)
+                    .build();
+            scan=new AdvertiseData.Builder()
+                    .addServiceUuid(new ParcelUuid(S3xyProtocol.BUTTON_SERVICE))
+                    .setIncludeDeviceName(false)
+                    .build();
+        }else{
+            data=new AdvertiseData.Builder()
+                    .addServiceUuid(new ParcelUuid(S3xyProtocol.BUTTON_SERVICE))
+                    .setIncludeDeviceName(false)
+                    .setIncludeTxPowerLevel(false)
+                    .build();
+            scan=new AdvertiseData.Builder().setIncludeDeviceName(false).build();
         }
+        try{advertiser.startAdvertising(st,data,scan,adCallback);}
+        catch(Exception e){listener.onCommanderLog("PAIR advertise exception: "+e.getMessage());}
+    }
+
+    private void restartAdvertisingDelayed(long delay){
+        main.postDelayed(()->{
+            if(server==null||adapter==null||!adapter.isEnabled())return;
+            try{
+                if(advertiser!=null&&advertising)advertiser.stopAdvertising(adCallback);
+            }catch(Exception ignored){}
+            advertising=false;
+            advertise();
+        },delay);
+    }
+
+    private void enablePairingIdentity(){
+        if(adapter==null||!hasConnect())return;
+        try{
+            if(savedAdapterName==null)savedAdapterName=adapter.getName();
+            boolean ok=adapter.setName("ENH_BTN");
+            listener.onCommanderLog("PAIR temporary local name ENH_BTN set="+ok);
+        }catch(Exception e){listener.onCommanderLog("PAIR temporary name error: "+e.getMessage());}
+    }
+
+    private void restoreAdapterName(){
+        if(adapter==null||!hasConnect()||savedAdapterName==null)return;
+        try{
+            boolean ok=adapter.setName(savedAdapterName);
+            listener.onCommanderLog("PAIR local name restored set="+ok);
+        }catch(Exception e){listener.onCommanderLog("PAIR restore name error: "+e.getMessage());}
+        savedAdapterName=null;
+    }
+
+    private void enterCompatibilityMode(){
+        if(compatibilityMode||!pairingWindow)return;
+        compatibilityMode=true;
+        prefs.edit().putBoolean("commander_plain_gatt",true).apply();
+        listener.onCommanderLog("PAIR switching to plain-GATT compatibility mode after early disconnects");
+        listener.onCommanderStatus("Commander 호환 모드로 자동 재시도…");
+        main.postDelayed(()->{
+            if(!pairingWindow)return;
+            closeServerOnly();
+            openServer();
+        },500);
     }
 
     private final AdvertiseCallback adCallback=new AdvertiseCallback(){
         @Override public void onStartSuccess(AdvertiseSettings s){
             advertising=true;
+            listener.onCommanderLog("PAIR advertising started name="+(pairingWindow?"ENH_BTN":"hidden")+" compat="+compatibilityMode);
             listener.onCommanderStatus(pairingWindow
-                    ?"페어링 모드 — 공식 앱의 '꾹 누르세요' 화면에서 대기"
-                    :"S3XY 서비스 광고 중 — 폰 Bluetooth 이름 변경 없음");
+                    ?"페어링 모드 — ENH_BTN 광고 중"
+                    :"S3XY 서비스 광고 중");
         }
         @Override public void onStartFailure(int e){
             advertising=false;
+            listener.onCommanderLog("PAIR advertising failure code="+e);
             listener.onCommanderStatus("광고 실패 code="+e);
         }
     };
 
     private final BluetoothGattServerCallback callback=new BluetoothGattServerCallback(){
         @Override public void onServiceAdded(int status,BluetoothGattService service){
-            if(status==BluetoothGatt.GATT_SUCCESS)advertise();
-            else listener.onCommanderStatus("서비스 등록 오류="+status);
+            if(status==BluetoothGatt.GATT_SUCCESS){
+                if(pairingWindow)main.postDelayed(CommanderVirtualButtonServer.this::advertise,250);
+                else advertise();
+            }else listener.onCommanderStatus("서비스 등록 오류="+status);
         }
 
         @Override public void onConnectionStateChange(BluetoothDevice d,int status,int state){
-            if(state==android.bluetooth.BluetoothProfile.STATE_CONNECTED){
+            if(state==android.bluetooth.BluetoothProfile.STATE_CONNECTED&&status==BluetoothGatt.GATT_SUCCESS){
                 commander=d;
-                listener.onCommanderLog("Commander connected "+safeAddr(d)+" status="+status+" bond="+bondState(safeBond(d)));
-                listener.onCommanderStatus("Commander 연결 — 보안 본딩 확인 중");
-                // Android's encrypted ID characteristic will also trigger security on access,
-                // but proactively starting bonding makes the pairing flow deterministic.
-                if(pairingWindow||safeBond(d)!=BluetoothDevice.BOND_BONDED)requestBond(d);
-                else listener.onCommanderStatus("Commander 본딩됨 — 알림 구독 대기");
+                pendingNotifications.clear();
+                int bond=safeBond(d);
+                listener.onCommanderLog("PAIR Commander connected "+safeAddr(d)+" status="+status+" bond="+bondState(bond)+" compat="+compatibilityMode);
+                if(bond==BluetoothDevice.BOND_BONDED)listener.onCommanderStatus("Commander 연결됨 · 알림 구독 대기");
+                else if(bond==BluetoothDevice.BOND_BONDING)listener.onCommanderStatus("Commander 연결됨 · 본딩 진행 중");
+                else listener.onCommanderStatus("Commander 연결됨 · 보안 핸드셰이크 대기");
             }else if(state==android.bluetooth.BluetoothProfile.STATE_DISCONNECTED){
-                listener.onCommanderLog("Commander disconnected "+safeAddr(d)+" status="+status);
+                boolean wasReady=subscribed;
+                listener.onCommanderLog("PAIR Commander disconnected "+safeAddr(d)+" status="+status+" ready="+wasReady);
                 commander=null;
                 subscribed=false;
+                pendingNotifications.clear();
                 listener.onCommanderReady(false);
+                if(pairingWindow&&!wasReady){
+                    earlyDisconnects++;
+                    listener.onCommanderLog("PAIR early disconnect count="+earlyDisconnects);
+                    if(earlyDisconnects>=EARLY_DISCONNECTS_FOR_COMPAT&&!compatibilityMode){
+                        enterCompatibilityMode();
+                        return;
+                    }
+                }
                 listener.onCommanderStatus(pairingWindow
-                        ?"Commander 연결 끊김 — 페어링 광고 유지"
+                        ?"Commander 연결 끊김 — 자동 재광고 중"
                         :"Commander 연결 끊김 — 광고 유지");
-                if(!advertising)restartAdvertising();
+                restartAdvertisingDelayed(350);
+            }else if(status!=BluetoothGatt.GATT_SUCCESS){
+                listener.onCommanderLog("PAIR connection state error status="+status+" state="+state);
             }
         }
 
         @Override public void onCharacteristicReadRequest(BluetoothDevice d,int req,int off,BluetoothGattCharacteristic c){
             if(server==null)return;
             byte[] v=S3xyProtocol.BUTTON_ID.equals(c.getUuid())?Arrays.copyOf(id,id.length):new byte[]{0x00};
+            listener.onCommanderLog("PAIR read "+c.getUuid()+" off="+off+" bond="+bondState(safeBond(d)));
             if(off>v.length){server.sendResponse(d,req,BluetoothGatt.GATT_INVALID_OFFSET,off,null);return;}
             server.sendResponse(d,req,BluetoothGatt.GATT_SUCCESS,off,Arrays.copyOfRange(v,off,v.length));
         }
@@ -260,24 +327,30 @@ public final class CommanderVirtualButtonServer {
         @Override public void onCharacteristicWriteRequest(BluetoothDevice d,int req,BluetoothGattCharacteristic c,boolean prep,boolean response,int off,byte[] v){
             if(response&&server!=null)server.sendResponse(d,req,BluetoothGatt.GATT_SUCCESS,off,v);
             if(!S3xyProtocol.BUTTON_ID.equals(c.getUuid())||v==null)return;
-            listener.onCommanderLog("ID write "+S3xyProtocol.hex(v));
+            listener.onCommanderLog("PAIR ID write "+S3xyProtocol.hex(v)+" subscribed="+subscribed+" bond="+bondState(safeBond(d)));
             if(S3xyProtocol.equals(v,0xB6)){
-                notifyBytes(S3xyProtocol.initReply());
-                listener.onCommanderLog("PAIR handshake B6 -> C7 00 01");
+                queueOrNotify(S3xyProtocol.initReply());
+                listener.onCommanderLog(subscribed?"PAIR handshake B6 -> C7 00 01":"PAIR handshake B6 queued until CCCD subscribe");
             }else if(S3xyProtocol.equals(v,0xA1)&&server!=null){
+                listener.onCommanderLog("PAIR Commander requested disconnect A1");
                 server.cancelConnection(d);
             }else if(v.length==4&&(v[0]&0xFF)==0xA4){
-                notifyBytes(new byte[]{(byte)0xA4,0x00,v[1],v[2]});
+                queueOrNotify(new byte[]{(byte)0xA4,0x00,v[1],v[2]});
             }
         }
 
         @Override public void onDescriptorWriteRequest(BluetoothDevice d,int req,BluetoothGattDescriptor desc,boolean prep,boolean response,int off,byte[] v){
             if(S3xyProtocol.CCCD.equals(desc.getUuid())){
                 subscribed=Arrays.equals(v,BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
-                listener.onCommanderLog("PAIR CCCD "+(subscribed?"enabled":"disabled"));
+                int queued=pendingNotifications.size();
+                listener.onCommanderLog("PAIR CCCD "+(subscribed?"enabled":"disabled")+" pending="+queued);
                 listener.onCommanderReady(isReady());
                 listener.onCommanderStatus(subscribed?"Commander 준비 완료":"Commander 알림 해제됨");
-                if(subscribed)notifyBytes(new byte[]{0x00});
+                if(subscribed){
+                    if(queued>0)flushPendingNotifications();
+                    else notifyBytes(new byte[]{0x00});
+                    if(pairingWindow)main.postDelayed(CommanderVirtualButtonServer.this::closePairingWindowNow,800);
+                }
             }
             if(response&&server!=null)server.sendResponse(d,req,BluetoothGatt.GATT_SUCCESS,off,v);
         }
@@ -285,6 +358,14 @@ public final class CommanderVirtualButtonServer {
         @Override public void onDescriptorReadRequest(BluetoothDevice d,int req,int off,BluetoothGattDescriptor desc){
             if(server!=null)server.sendResponse(d,req,BluetoothGatt.GATT_SUCCESS,off,
                     subscribed?BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE:BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE);
+        }
+
+        @Override public void onMtuChanged(BluetoothDevice d,int mtu){
+            listener.onCommanderLog("PAIR MTU="+mtu);
+        }
+
+        @Override public void onNotificationSent(BluetoothDevice d,int status){
+            listener.onCommanderLog("PAIR notification sent status="+status);
         }
     };
 
@@ -295,18 +376,13 @@ public final class CommanderVirtualButtonServer {
             if(Build.VERSION.SDK_INT>=33)d=i.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE,BluetoothDevice.class);
             else d=i.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
             if(d==null||commander==null||!safeAddr(d).equals(safeAddr(commander)))return;
-
             int state=i.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE,BluetoothDevice.ERROR);
             int prev=i.getIntExtra(BluetoothDevice.EXTRA_PREVIOUS_BOND_STATE,BluetoothDevice.ERROR);
             listener.onCommanderLog("PAIR bond "+bondState(prev)+" -> "+bondState(state));
-            if(state==BluetoothDevice.BOND_BONDED){
-                listener.onCommanderStatus("Commander 본딩 완료 — 초기화 대기");
-            }else if(state==BluetoothDevice.BOND_NONE&&prev==BluetoothDevice.BOND_BONDING){
-                listener.onCommanderStatus("Commander 본딩 실패 — 페어링 다시 시도");
-                if(pairingWindow)main.postDelayed(()->requestBond(commander),800);
-            }else if(state==BluetoothDevice.BOND_BONDING){
-                listener.onCommanderStatus("Commander 본딩 진행 중…");
-            }
+            if(state==BluetoothDevice.BOND_BONDED)listener.onCommanderStatus("Commander 본딩 완료 · 초기화 대기");
+            else if(state==BluetoothDevice.BOND_BONDING)listener.onCommanderStatus("Commander 본딩 진행 중…");
+            else if(state==BluetoothDevice.BOND_NONE&&prev==BluetoothDevice.BOND_BONDING)
+                listener.onCommanderStatus("Commander 본딩 해제/실패 · 자동 재광고 대기");
         }
     };
 
@@ -317,9 +393,7 @@ public final class CommanderVirtualButtonServer {
             if(Build.VERSION.SDK_INT>=33)context.registerReceiver(bondReceiver,f,Context.RECEIVER_EXPORTED);
             else context.registerReceiver(bondReceiver,f);
             bondReceiverRegistered=true;
-        }catch(Exception e){
-            listener.onCommanderLog("PAIR bond receiver error: "+e.getMessage());
-        }
+        }catch(Exception e){listener.onCommanderLog("PAIR bond receiver error: "+e.getMessage());}
     }
 
     private void unregisterBondReceiver(){
@@ -328,15 +402,33 @@ public final class CommanderVirtualButtonServer {
         bondReceiverRegistered=false;
     }
 
+    private void queueOrNotify(byte[] v){
+        if(v==null)return;
+        if(isReady()){
+            notifyBytes(v);
+            return;
+        }
+        if(pendingNotifications.size()>=8)pendingNotifications.removeFirst();
+        pendingNotifications.addLast(Arrays.copyOf(v,v.length));
+    }
+
+    private void flushPendingNotifications(){
+        while(isReady()&&!pendingNotifications.isEmpty()){
+            notifyBytes(pendingNotifications.removeFirst());
+            sleep(8);
+        }
+    }
+
     private void notifyBytes(byte[] v){
         if(!hasConnect()||server==null||commander==null||notifyChar==null||!subscribed)return;
         listener.onCommanderLog("TX -> Commander: "+S3xyProtocol.hex(v));
         if(Build.VERSION.SDK_INT>=33){
             int r=server.notifyCharacteristicChanged(commander,notifyChar,false,v);
-            if(r!=0)listener.onCommanderLog("notify status="+r);
+            if(r!=0)listener.onCommanderLog("PAIR notify start status="+r);
         }else{
             notifyChar.setValue(v);
-            server.notifyCharacteristicChanged(commander,notifyChar,false);
+            boolean ok=server.notifyCharacteristicChanged(commander,notifyChar,false);
+            if(!ok)listener.onCommanderLog("PAIR notify start failed");
         }
     }
 
