@@ -7,8 +7,8 @@ p=root/'app/build.gradle'
 s=p.read_text()
 s=s.replace('versionCode 12','versionCode 14')
 s=s.replace("versionName '0.7.0-commander-direct-lab'","versionName '0.7.2-direct-connect'")
-if 'versionCode 13' not in s or "versionName '0.7.1-direct-connect'" not in s:
-    raise SystemExit('0.7.1 version bump failed')
+if 'versionCode 14' not in s or "versionName '0.7.2-direct-connect'" not in s:
+    raise SystemExit('0.7.2 version bump failed')
 p.write_text(s)
 
 # MainActivity: shared Direct manager, automatic Commander selection, no BLE device clutter.
@@ -79,6 +79,19 @@ if 'syncDirect();' not in s:
 '''
     s=s.replace('    @Override public void onSnapshot(BridgeEngine.Snapshot s){',
                 insert+'    @Override public void onSnapshot(BridgeEngine.Snapshot s){')
+p.write_text(s)
+
+# Ensure service re-syncs Direct mode on every start command, including refresh intents.
+p=root/'app/src/main/java/com/openai/s3xybridge/BridgeForegroundService.java'
+s=p.read_text()
+s=s.replace('''        if(intent!=null&&ACTION_REFRESH_TRIGGER.equals(intent.getAction()))vehicleTrigger.refresh();
+        else engine.ensureRunning();
+        return START_STICKY;
+''','''        if(intent!=null&&ACTION_REFRESH_TRIGGER.equals(intent.getAction()))vehicleTrigger.refresh();
+        else engine.ensureRunning();
+        syncDirect();
+        return START_STICKY;
+''')
 p.write_text(s)
 
 print('v0.7.2 Direct Connect release patch applied')
