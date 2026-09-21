@@ -70,10 +70,10 @@ if old not in s: raise SystemExit('Commander identity block not found')
 s=s.replace(old,new,1)
 
 needle='''            List<BluetoothGattService> services=source.getServices();
-            log("DIRECT SERVICES count="+(services==null?0:services.size()));
+            log("DIRECT SERVICES BEGIN count="+(services==null?0:services.size()));
 '''
 repl='''            List<BluetoothGattService> services=source.getServices();
-            log("DIRECT SERVICES count="+(services==null?0:services.size()));
+            log("DIRECT SERVICES BEGIN count="+(services==null?0:services.size()));
             if(source.getService(COMMANDER_SERVICE)==null){
                 String bad=device==null?"":safeAddr(device);
                 log("DIRECT connected device is not Commander; reject "+bad);
