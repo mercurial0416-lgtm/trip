@@ -15,7 +15,8 @@ import android.bluetooth.le.ScanCallback;
 import android.bluetooth.le.ScanRecord;
 import android.bluetooth.le.ScanResult;
 import android.content.Context;
-import android.content.pm.PackageManager;\nimport android.content.SharedPreferences;
+import android.content.pm.PackageManager;
+import android.content.SharedPreferences;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
@@ -26,7 +27,8 @@ import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;\nimport java.util.concurrent.CopyOnWriteArrayList;
+import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.UUID;
 
 /**
@@ -69,7 +71,8 @@ public final class CommanderDirectProbe {
     private boolean scanning;
     private boolean connected;
     private boolean opBusy;
-    private boolean autoConnecting;\n    private boolean wanted;
+    private boolean autoConnecting;
+    private boolean wanted;
 
     private static final class Op {
         static final int READ=1, SUBSCRIBE=2;
@@ -137,7 +140,8 @@ public final class CommanderDirectProbe {
         }
     }
 
-    private final Runnable stopScanRunnable=this::stopScan;\n    private final Runnable scanRetryRunnable=()->{if(wanted&&!connected&&!autoConnecting)startScan();};
+    private final Runnable stopScanRunnable=this::stopScan;
+    private final Runnable scanRetryRunnable=()->{if(wanted&&!connected&&!autoConnecting)startScan();};
 
     public void connect(BluetoothDevice d){
         wanted=true;
