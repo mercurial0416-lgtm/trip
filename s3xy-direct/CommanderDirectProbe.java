@@ -108,7 +108,7 @@ public final class CommanderDirectProbe {
         main.removeCallbacks(scanRetryRunnable);
         if(!hasScan()||!hasConnect()){status("Bluetooth 권한 필요",false);return;}
         if(adapter==null||!adapter.isEnabled()){status("Bluetooth를 켜세요",false);return;}
-        stopScan();
+        stopScanInternal(false);
         scanner=adapter.getBluetoothLeScanner();
         if(scanner==null){status("BLE scanner 없음",false);return;}
         seen.clear();
@@ -126,7 +126,9 @@ public final class CommanderDirectProbe {
         }
     }
 
-    public void stopScan(){
+    public void stopScan(){stopScanInternal(true);}
+
+    private void stopScanInternal(boolean scheduleRetry){
         main.removeCallbacks(stopScanRunnable);
         if(!scanning)return;
         scanning=false;
@@ -136,7 +138,10 @@ public final class CommanderDirectProbe {
         log("DIRECT scan stop");
         if(!connected){
             status(wanted?"Commander 재검색 대기":"Commander 직접 연결 대기",false);
-            if(wanted&&!autoConnecting){main.removeCallbacks(scanRetryRunnable);main.postDelayed(scanRetryRunnable,2500);}
+            if(scheduleRetry&&wanted&&!autoConnecting){
+                main.removeCallbacks(scanRetryRunnable);
+                main.postDelayed(scanRetryRunnable,2500);
+            }
         }
     }
 
@@ -150,9 +155,10 @@ public final class CommanderDirectProbe {
 
     private void connectInternal(BluetoothDevice d){
         if(d==null||!hasConnect()){status("Commander 연결 권한 필요",false);return;}
-        autoConnecting=true;
-        stopScan();
         closeGatt();
+        autoConnecting=true;
+        stopScanInternal(false);
+        main.removeCallbacks(scanRetryRunnable);
         device=d;
         String label=safeName(d)+" "+safeAddr(d);
         log("DIRECT connect -> "+label);
@@ -160,10 +166,16 @@ public final class CommanderDirectProbe {
         try{
             if(Build.VERSION.SDK_INT>=23)gatt=d.connectGatt(context,false,gattCallback,BluetoothDevice.TRANSPORT_LE);
             else gatt=d.connectGatt(context,false,gattCallback);
-            if(gatt==null)status("Commander GATT 생성 실패",false);
+            if(gatt==null){
+                autoConnecting=false;
+                status("Commander GATT 생성 실패",false);
+                if(wanted)main.postDelayed(scanRetryRunnable,1500);
+            }
         }catch(Exception e){
+            autoConnecting=false;
             log("DIRECT connectGatt exception: "+e);
             status("Commander 직접 연결 실패",false);
+            if(wanted)main.postDelayed(scanRetryRunnable,1500);
         }
     }
 
@@ -177,7 +189,7 @@ public final class CommanderDirectProbe {
     public void disconnect(){
         wanted=false;
         main.removeCallbacks(scanRetryRunnable);
-        stopScan();
+        stopScanInternal(false);
         closeGatt();
         device=null;
         status("Commander 직접 연결 대기",false);
@@ -196,7 +208,7 @@ public final class CommanderDirectProbe {
         wanted=false;
         main.removeCallbacks(scanRetryRunnable);
         main.removeCallbacks(stopScanRunnable);
-        stopScan();
+        stopScanInternal(false);
         closeGatt();
         device=null;
     }
@@ -208,6 +220,7 @@ public final class CommanderDirectProbe {
             scanning=false;
             log("DIRECT scan failed code="+errorCode);
             status("Commander 검색 실패 code="+errorCode,false);
+            if(wanted){main.removeCallbacks(scanRetryRunnable);main.postDelayed(scanRetryRunnable,2500);}
         }
     };
 
