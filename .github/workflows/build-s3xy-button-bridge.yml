@@ -56,6 +56,10 @@ jobs:
         shell: bash
         run: python3 s3xy-direct/patch_direct_probe.py
 
+      - name: Apply Commander Direct Connect release
+        shell: bash
+        run: python3 s3xy-direct/patch_direct_release.py
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
