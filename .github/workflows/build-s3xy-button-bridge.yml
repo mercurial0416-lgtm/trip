@@ -44,6 +44,10 @@ jobs:
         shell: bash
         run: python3 s3xy-resilience/patch_resilience.py
 
+      - name: Apply updater cache-bust fix
+        shell: bash
+        run: python3 s3xy-updater/patch_cache_bust.py
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
