@@ -157,12 +157,15 @@ if old not in s: raise SystemExit('startScan marker not found')
 s=s.replace(old,new,1)
 
 # Auto-select the physical button in easy mode.
-old='''    private void handleScan(ScanResult r){if(r==null||r.getDevice()==null)return;String name="";try{name=r.getScanRecord()==null?null:r.getScanRecord().getDeviceName();}catch(Exception ignored){}boolean svc=false;try{svc=r.getScanRecord()!=null&&r.getScanRecord().getServiceUuids()!=null&&r.getScanRecord().getServiceUuids().contains(new ParcelUuid(S3xyProtocol.BUTTON_SERVICE));}catch(Exception ignored){}if(!("ENH_BTN".equals(name)||svc))return;String addr=safeAddr(r.getDevice());if(found.containsKey(addr))return;found.put(addr,r.getDevice());String fn=name==null||name.isEmpty()?"ENH_BTN":name;runOnUiThread(()->{TextView item=text(fn+"  RSSI "+r.getRssi()+"\n"+addr+"  · 탭해서 연결",13,true,TEXT);item.setPadding(dp(12),dp(12),dp(12),dp(12));item.setBackground(rounded(Color.rgb(11,25,38),BLUE,12,1));item.setOnClickListener(v->{stopScan();engine.connectReal(r.getDevice());});scanResults.addView(item,margins(-1,-2,0,0,0,7));});}
-'''
-new='''    private void handleScan(ScanResult r){if(r==null||r.getDevice()==null)return;String name="";try{name=r.getScanRecord()==null?null:r.getScanRecord().getDeviceName();}catch(Exception ignored){}boolean svc=false;try{svc=r.getScanRecord()!=null&&r.getScanRecord().getServiceUuids()!=null&&r.getScanRecord().getServiceUuids().contains(new ParcelUuid(S3xyProtocol.BUTTON_SERVICE));}catch(Exception ignored){}if(!("ENH_BTN".equals(name)||svc))return;String addr=safeAddr(r.getDevice());if(found.containsKey(addr))return;found.put(addr,r.getDevice());if(easyAutoConnect){runOnUiThread(()->{easyAutoConnect=false;stopScan();engine.connectReal(r.getDevice());if(directProbe!=null)main.postDelayed(()->directProbe.startAuto(),700);});return;}String fn=name==null||name.isEmpty()?"ENH_BTN":name;runOnUiThread(()->{TextView item=text(fn+"  RSSI "+r.getRssi()+"\n"+addr+"  · 탭해서 연결",13,true,TEXT);item.setPadding(dp(12),dp(12),dp(12),dp(12));item.setBackground(rounded(Color.rgb(11,25,38),BLUE,12,1));item.setOnClickListener(v->{stopScan();engine.connectReal(r.getDevice());});scanResults.addView(item,margins(-1,-2,0,0,0,7));});}
-'''
-if old not in s: raise SystemExit('handleScan marker not found')
-s=s.replace(old,new,1)
+lines=s.splitlines()
+idx=next((i for i,x in enumerate(lines) if x.strip().startswith('private void handleScan(ScanResult r)')),None)
+if idx is None: raise SystemExit('handleScan marker not found')
+line=lines[idx]
+needle='found.put(addr,r.getDevice());String fn='
+insert='found.put(addr,r.getDevice());if(easyAutoConnect){runOnUiThread(()->{easyAutoConnect=false;stopScan();engine.connectReal(r.getDevice());if(directProbe!=null)main.postDelayed(()->directProbe.startAuto(),700);});return;}String fn='
+if needle not in line: raise SystemExit('handleScan insertion marker not found')
+lines[idx]=line.replace(needle,insert,1)
+s='\n'.join(lines)+'\n'
 
 # Permission completion also uses Easy Connect.
 old='''    @Override public void onRequestPermissionsResult(int r,String[] p,int[] g){super.onRequestPermissionsResult(r,p,g);if(r==REQ_PERMS){engine.ensureRunning();if(hasScan()&&hasConnect()){engine.stopCommander();if(!engine.isVehicleAutoEnabled()||engine.isDriveSessionActive())directProbe.startAuto();}}}
