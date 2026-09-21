@@ -60,6 +60,10 @@ jobs:
         shell: bash
         run: python3 s3xy-direct/patch_direct_release.py
 
+      - name: Apply Commander Direct resilience
+        shell: bash
+        run: python3 s3xy-direct/patch_direct_resilience.py
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
