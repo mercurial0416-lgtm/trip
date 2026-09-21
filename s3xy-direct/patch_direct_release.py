@@ -7,7 +7,7 @@ p=root/'app/build.gradle'
 s=p.read_text()
 s=s.replace('versionCode 12','versionCode 15')
 s=s.replace("versionName '0.7.0-commander-direct-lab'","versionName '0.7.3-direct-connect'")
-if 'versionCode 14' not in s or "versionName '0.7.2-direct-connect'" not in s:
+if 'versionCode 15' not in s or "versionName '0.7.3-direct-connect'" not in s:
     raise SystemExit('0.7.3 version bump failed')
 p.write_text(s)
 
