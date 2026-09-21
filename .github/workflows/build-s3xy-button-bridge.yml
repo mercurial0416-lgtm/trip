@@ -48,6 +48,10 @@ jobs:
         shell: bash
         run: python3 s3xy-updater/patch_cache_bust.py
 
+      - name: Apply Commander pairing compatibility
+        shell: bash
+        run: python3 s3xy-pairing/patch_commander_pairing_compat.py
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
