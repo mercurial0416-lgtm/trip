@@ -1,9 +1,9 @@
 {
-  "versionCode": 9,
-  "versionName": "0.6.3-resilience",
+  "versionCode": 11,
+  "versionName": "0.6.5-pairing-compat",
   "apkB64Urls": [
-    "https://raw.githubusercontent.com/mercurial0416-lgtm/trip/s3xy-button-bridge-build/s3xy-update/0.6.3.apk.b64"
+    "https://raw.githubusercontent.com/mercurial0416-lgtm/trip/s3xy-button-bridge-build/s3xy-update/0.6.5.apk.b64"
   ],
-  "sha256": "a7fce28425c6b2717954e45167f31b8e3ff12875abac8586be4b2f23fad25cf1",
-  "notes": "BLE 자동복구를 강화했습니다. 오래된 GATT 콜백 차단, 30초 연결 타임아웃, Bluetooth OFF/ON 후 재접속 복구, 중복 재연결 방지, 재시도 백오프 개선, 반복 끊김 알림 방지."
+  "sha256": "47cebd96f84c90730131438f705253ee88089f2fa557682feaae231636b7e1f8",
+  "notes": "Commander 페어링 호환성을 강화했습니다. 페어링 30초 동안만 ENH_BTN 이름을 광고하고 즉시 원복하며, 폰의 선제 본딩을 제거했습니다. B6 핸드셰이크 응답을 CCCD 구독 전에도 보관해 유실되지 않게 했고, 초기 연결 끊김이 반복되면 plain-GATT 호환 모드로 자동 재시도합니다."
 }
