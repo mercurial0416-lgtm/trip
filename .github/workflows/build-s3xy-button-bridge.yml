@@ -72,6 +72,10 @@ jobs:
         shell: bash
         run: python3 s3xy-direct/patch_easy_v075.py
 
+      - name: Apply Fast Highbeam v0.7.6
+        shell: bash
+        run: python3 s3xy-direct/apply_fast_highbeam_v076.py
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
