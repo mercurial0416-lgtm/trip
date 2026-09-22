@@ -80,6 +80,10 @@ jobs:
         shell: bash
         run: python3 s3xy-direct/patch_fast_highbeam_v077.py
 
+      - name: Apply Clone ID v0.7.8
+        shell: bash
+        run: python3 s3xy-direct/apply_clone_v078.py
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
