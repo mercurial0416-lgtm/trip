@@ -382,3 +382,96 @@ s=s.replace(
 ''',1)
 p.write_text(s)
 print('v0.7.9 commander session-owner hotfix applied')
+
+
+# v0.7.10 hotfix: make physical-button identity capture self-recovering and observable.
+# Field logs showed clone setup waiting forever with no 3D49 read attempt. Retry the
+# physical GATT identity read after subscribe/bond timing races and expose each stage.
+p=root/'app/src/main/java/com/openai/s3xybridge/RealButtonClient.java'
+s=p.read_text()
+s=s.replace(
+'''    private void readIdentityThenHandshake() {
+        BluetoothGatt local=gatt;
+        if(!hasConnect()||local==null||idChar==null||!subscribed){writeHandshake();return;}
+        boolean started=false;
+        try{started=local.readCharacteristic(idChar);}catch(Exception e){listener.onRealLog("3D49 read exception: "+e.getMessage());}
+        listener.onRealLog("3D49 identity read start="+started);
+        if(!started)main.postDelayed(this::writeHandshake,80);
+    }
+''',
+'''    private int identityReadAttempts;
+    private void readIdentityThenHandshake() {
+        BluetoothGatt local=gatt;
+        if(!hasConnect()||local==null){
+            listener.onRealLog("CLONE stage=3D49 blocked: GATT unavailable");
+            return;
+        }
+        if(idChar==null){
+            listener.onRealLog("CLONE stage=3D49 blocked: characteristic missing");
+            writeHandshake();return;
+        }
+        if(!subscribed){
+            listener.onRealLog("CLONE stage=3D49 waiting: notify not subscribed");
+            main.postDelayed(this::readIdentityThenHandshake,180);return;
+        }
+        boolean started=false;
+        identityReadAttempts++;
+        try{started=local.readCharacteristic(idChar);}catch(Exception e){listener.onRealLog("3D49 read exception: "+e.getMessage());}
+        listener.onRealLog("CLONE stage=3D49 read attempt="+identityReadAttempts+" start="+started+" bond="+safeBond(device));
+        if(!started){
+            if(identityReadAttempts<4)main.postDelayed(this::readIdentityThenHandshake,220);
+            else {listener.onRealLog("CLONE stage=3D49 read start failed after retries");writeHandshake();}
+        }
+    }
+
+    private String safeBond(BluetoothDevice d){
+        try{return d==null?"?":String.valueOf(d.getBondState());}catch(Exception e){return "?";}
+    }
+''',1)
+s=s.replace(
+'''        if(status==BluetoothGatt.GATT_SUCCESS&&value!=null&&value.length>0&&value.length<=20){
+            byte[] copy=Arrays.copyOf(value,value.length);
+            listener.onRealLog("3D49 stable identity: "+S3xyProtocol.hex(copy));
+            listener.onRealIdentity(copy);
+        }else listener.onRealLog("3D49 identity read failed status="+status+" len="+(value==null?-1:value.length));
+        main.postDelayed(this::writeHandshake,80);
+''',
+'''        if(status==BluetoothGatt.GATT_SUCCESS&&value!=null&&value.length>0&&value.length<=20){
+            identityReadAttempts=0;
+            byte[] copy=Arrays.copyOf(value,value.length);
+            listener.onRealLog("CLONE stage=3D49 captured: "+S3xyProtocol.hex(copy));
+            listener.onRealIdentity(copy);
+            main.postDelayed(this::writeHandshake,80);
+        }else{
+            listener.onRealLog("CLONE stage=3D49 read failed status="+status+" len="+(value==null?-1:value.length)+" attempt="+identityReadAttempts);
+            if(identityReadAttempts<4)main.postDelayed(this::readIdentityThenHandshake,220);
+            else {identityReadAttempts=0;main.postDelayed(this::writeHandshake,80);}
+        }
+''',1)
+# Reset retry state on each new physical-button connection.
+s=s.replace(
+'''            if(newState==BluetoothProfile.STATE_CONNECTED){
+''',
+'''            if(newState==BluetoothProfile.STATE_CONNECTED){
+                identityReadAttempts=0;
+                listener.onRealLog("CLONE stage=physical GATT connected "+safeAddr(g.getDevice()));
+''',1)
+p.write_text(s)
+
+# UI diagnostics: make scan start explicit in logs so a missing scan callback is distinguishable.
+p=root/'app/src/main/java/com/openai/s3xybridge/MainActivity.java'
+s=p.read_text()
+s=s.replace(
+'''        startButtonScan(true);
+    }
+
+    private void startHighBeamPairing(){
+''',
+'''        engine.log("CLONE stage=physical scan start");
+        startButtonScan(true);
+    }
+
+    private void startHighBeamPairing(){
+''',1)
+p.write_text(s)
+print('v0.7.10 physical 3D49 retry/diagnostic hotfix applied')
