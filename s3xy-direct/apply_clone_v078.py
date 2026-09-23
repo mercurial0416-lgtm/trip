@@ -315,3 +315,70 @@ s=s.replace("App: 0.7.7-fast-highbeam-flash","App: 0.7.8-clone-id")
 p.write_text(s)
 
 print('v0.7.8 clone-id patch applied')
+
+
+# v0.7.9 hotfix: keep one GATT-server peer as the Commander session owner.
+# Real logs showed several centrals connecting at once; the old callback overwrote
+# 'commander' for every connection, mixing bond/CCCD/notification state.
+p=root/'app/src/main/java/com/openai/s3xybridge/CommanderVirtualButtonServer.java'
+s=p.read_text()
+s=s.replace(
+'''            if(state==android.bluetooth.BluetoothProfile.STATE_CONNECTED&&status==BluetoothGatt.GATT_SUCCESS){
+                commander=d;
+                pendingNotifications.clear();
+''',
+'''            if(state==android.bluetooth.BluetoothProfile.STATE_CONNECTED&&status==BluetoothGatt.GATT_SUCCESS){
+                if(commander!=null&&!safeAddr(commander).equals(safeAddr(d))){
+                    listener.onCommanderLog("PAIR ignoring extra central "+safeAddr(d)+" owner="+safeAddr(commander));
+                    if(server!=null)try{server.cancelConnection(d);}catch(Exception ignored){}
+                    return;
+                }
+                commander=d;
+                pendingNotifications.clear();
+''',1)
+s=s.replace(
+'''            }else if(state==android.bluetooth.BluetoothProfile.STATE_DISCONNECTED){
+                boolean wasReady=subscribed;
+''',
+'''            }else if(state==android.bluetooth.BluetoothProfile.STATE_DISCONNECTED){
+                if(commander==null||!safeAddr(commander).equals(safeAddr(d))){
+                    listener.onCommanderLog("PAIR ignoring non-owner disconnect "+safeAddr(d)+" owner="+(commander==null?"none":safeAddr(commander)));
+                    return;
+                }
+                boolean wasReady=subscribed;
+''',1)
+s=s.replace(
+'''        @Override public void onCharacteristicReadRequest(BluetoothDevice d,int req,int off,BluetoothGattCharacteristic c){
+            if(server==null)return;
+''',
+'''        @Override public void onCharacteristicReadRequest(BluetoothDevice d,int req,int off,BluetoothGattCharacteristic c){
+            if(server==null)return;
+            if(commander==null||!safeAddr(commander).equals(safeAddr(d))){
+                listener.onCommanderLog("PAIR rejecting read from non-owner "+safeAddr(d));
+                server.sendResponse(d,req,BluetoothGatt.GATT_FAILURE,off,null);return;
+            }
+''',1)
+s=s.replace(
+'''        @Override public void onCharacteristicWriteRequest(BluetoothDevice d,int req,BluetoothGattCharacteristic c,boolean prep,boolean response,int off,byte[] v){
+            if(response&&server!=null)server.sendResponse(d,req,BluetoothGatt.GATT_SUCCESS,off,v);
+''',
+'''        @Override public void onCharacteristicWriteRequest(BluetoothDevice d,int req,BluetoothGattCharacteristic c,boolean prep,boolean response,int off,byte[] v){
+            if(commander==null||!safeAddr(commander).equals(safeAddr(d))){
+                listener.onCommanderLog("PAIR rejecting write from non-owner "+safeAddr(d));
+                if(response&&server!=null)server.sendResponse(d,req,BluetoothGatt.GATT_FAILURE,off,null);return;
+            }
+            if(response&&server!=null)server.sendResponse(d,req,BluetoothGatt.GATT_SUCCESS,off,v);
+''',1)
+s=s.replace(
+'''        @Override public void onDescriptorWriteRequest(BluetoothDevice d,int req,BluetoothGattDescriptor desc,boolean prep,boolean response,int off,byte[] v){
+            if(S3xyProtocol.CCCD.equals(desc.getUuid())){
+''',
+'''        @Override public void onDescriptorWriteRequest(BluetoothDevice d,int req,BluetoothGattDescriptor desc,boolean prep,boolean response,int off,byte[] v){
+            if(commander==null||!safeAddr(commander).equals(safeAddr(d))){
+                listener.onCommanderLog("PAIR rejecting CCCD from non-owner "+safeAddr(d));
+                if(response&&server!=null)server.sendResponse(d,req,BluetoothGatt.GATT_FAILURE,off,null);return;
+            }
+            if(S3xyProtocol.CCCD.equals(desc.getUuid())){
+''',1)
+p.write_text(s)
+print('v0.7.9 commander session-owner hotfix applied')
